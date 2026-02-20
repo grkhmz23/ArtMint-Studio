@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   try {
     // Rate limit: 10 nonces/min per IP
     const clientIp = getClientIp(req);
-    const limit = await checkRateLimit(`nonce:ip:${clientIp}`, 10, 60_000);
+    const limit = await checkRateLimit(`nonce:ip:${clientIp}`, 30, 60_000);
     if (!limit.allowed) {
       return NextResponse.json(
         { error: "Too many requests", code: "rate_limited" },

@@ -40,9 +40,10 @@ export function middleware(req: NextRequest) {
       [
         "default-src 'self'",
         "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
-        "style-src 'self' 'unsafe-inline'",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "font-src 'self' https://fonts.gstatic.com",
         "img-src 'self' data: blob: http://localhost:* https:",
-        "connect-src 'self' https://api.devnet.solana.com https://api.mainnet-beta.solana.com wss:",
+        "connect-src 'self' https://api.devnet.solana.com https://api.mainnet-beta.solana.com https://*.helius-rpc.com wss:",
         "frame-src 'self' blob:",
         "frame-ancestors 'none'",
       ].join("; ")
