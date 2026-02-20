@@ -4,6 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Variation } from "@artmint/common";
 import { ArtPreview } from "./ArtPreview";
+import { Button } from "@/components/ui/button";
+import { motion } from "framer-motion";
+import { X } from "lucide-react";
 
 interface Props {
   variation: Variation;
@@ -29,31 +32,19 @@ export function DetailPanel({
       setMintError("Connect your wallet first");
       return;
     }
-
     setMinting(true);
     setMintError(null);
-
     try {
-      // Step 1: Prepare mint (upload assets, create metadata)
       const res = await fetch("/api/mint", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          ...variation,
-          prompt,
-        }),
+        body: JSON.stringify({ ...variation, prompt }),
       });
-
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error ?? "Mint preparation failed");
       }
-
       const data = await res.json();
-
-      // Step 2: Build and sign the on-chain transaction
-      // For MVP, we redirect to the asset page which shows provenance
-      // The actual on-chain mint requires wallet signing which happens client-side
       router.push(`/asset/${data.placeholderMintAddress}`);
     } catch (err) {
       setMintError(err instanceof Error ? err.message : "Mint failed");
@@ -63,127 +54,122 @@ export function DetailPanel({
   };
 
   return (
-    <div
-      style={{
-        width: 380,
-        borderLeft: "1px solid var(--border)",
-        background: "var(--bg-card)",
-        overflow: "auto",
-        padding: 20,
-        display: "flex",
-        flexDirection: "column",
-        gap: 16,
-      }}
+    <motion.div
+      initial={{ x: 400, opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      exit={{ x: 400, opacity: 0 }}
+      transition={{ type: "spring", damping: 30, stiffness: 200 }}
+      className="w-[400px] shrink-0 bg-[var(--bg)] flex flex-col z-20 border-l border-[var(--border)]"
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h3 style={{ fontSize: 16, fontWeight: 600 }}>
-          {variation.title ?? `${variation.templateId} #${variation.seed}`}
-        </h3>
-        <button onClick={onClose} style={{ padding: "4px 8px", fontSize: 12 }}>
-          Close
+      {/* Header */}
+      <div className="p-6 border-b border-[var(--border)] flex justify-between items-center">
+        <h3 className="font-serif text-2xl text-white italic">Inspection.</h3>
+        <button
+          onClick={onClose}
+          className="text-[var(--text-dim)] hover:text-[var(--accent)] transition-colors"
+        >
+          <X size={20} strokeWidth={1} />
         </button>
       </div>
 
-      <div style={{ borderRadius: 8, overflow: "hidden", border: "1px solid var(--border)" }}>
-        <ArtPreview variation={variation} size={340} />
-      </div>
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-8">
+        {/* Preview */}
+        <div className="border border-[var(--border)] p-2">
+          <ArtPreview variation={variation} size={340} />
+        </div>
 
-      {variation.description && (
-        <p style={{ fontSize: 13, color: "var(--text-dim)" }}>{variation.description}</p>
-      )}
+        {variation.description && (
+          <p className="font-mono text-xs text-[var(--text-dim)] leading-relaxed">
+            {variation.description}
+          </p>
+        )}
 
-      {/* Params */}
-      <div>
-        <h4 style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, color: "var(--text-dim)" }}>
-          Parameters
-        </h4>
-        <div
-          style={{
-            background: "var(--bg)",
-            border: "1px solid var(--border)",
-            borderRadius: 6,
-            padding: 10,
-            fontSize: 11,
-            fontFamily: "monospace",
-            whiteSpace: "pre-wrap",
-            maxHeight: 200,
-            overflow: "auto",
-            lineHeight: 1.5,
-          }}
-        >
-          {JSON.stringify(
-            {
-              templateId: variation.templateId,
-              seed: variation.seed,
-              palette: variation.palette,
-              params: variation.params,
-            },
-            null,
-            2
-          )}
+        {/* Specs */}
+        <div>
+          <h4 className="font-mono text-[10px] text-[var(--text-dim)] uppercase tracking-widest mb-4 border-b border-[var(--border)] pb-2">
+            Technical Specifications
+          </h4>
+          <div className="font-mono text-[11px] text-[var(--text)] leading-loose">
+            <div className="flex justify-between border-b border-[var(--border)]/50 py-1">
+              <span className="text-[var(--text-dim)]">Template:</span>
+              <span>{variation.templateId}</span>
+            </div>
+            <div className="flex justify-between border-b border-[var(--border)]/50 py-1">
+              <span className="text-[var(--text-dim)]">Seed:</span>
+              <span>{variation.seed}</span>
+            </div>
+            <div className="flex justify-between border-b border-[var(--border)]/50 py-1">
+              <span className="text-[var(--text-dim)]">Dimensions:</span>
+              <span>1080x1080px</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Palette */}
+        <div>
+          <h4 className="font-mono text-[10px] text-[var(--text-dim)] uppercase tracking-widest mb-4 border-b border-[var(--border)] pb-2">
+            Extracted Palette
+          </h4>
+          <div className="flex gap-1 h-8 border border-[var(--border)] p-1">
+            {variation.palette.map((c, i) => (
+              <div
+                key={i}
+                className="flex-1 h-full"
+                style={{ backgroundColor: c }}
+                title={c}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Tags */}
+        {variation.tags && variation.tags.length > 0 && (
+          <div className="flex gap-2 flex-wrap">
+            {variation.tags.map((tag, i) => (
+              <span
+                key={i}
+                className="font-mono text-[10px] text-[var(--text-dim)] uppercase tracking-widest border border-[var(--border)] px-2 py-1"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Params JSON */}
+        <div>
+          <h4 className="font-mono text-[10px] text-[var(--text-dim)] uppercase tracking-widest mb-4 border-b border-[var(--border)] pb-2">
+            Parameters
+          </h4>
+          <pre className="font-mono text-[10px] text-[var(--text-dim)] leading-relaxed overflow-auto max-h-[200px] bg-[var(--bg-card)] border border-[var(--border)] p-3">
+            {JSON.stringify(variation.params, null, 2)}
+          </pre>
         </div>
       </div>
-
-      {/* Palette */}
-      <div>
-        <h4 style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, color: "var(--text-dim)" }}>
-          Palette
-        </h4>
-        <div style={{ display: "flex", gap: 4 }}>
-          {variation.palette.map((color, i) => (
-            <div
-              key={i}
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 4,
-                background: color,
-                border: "1px solid var(--border)",
-              }}
-              title={color}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Tags */}
-      {variation.tags && variation.tags.length > 0 && (
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {variation.tags.map((tag, i) => (
-            <span
-              key={i}
-              style={{
-                padding: "2px 8px",
-                fontSize: 11,
-                background: "var(--bg)",
-                border: "1px solid var(--border)",
-                borderRadius: 12,
-                color: "var(--text-dim)",
-              }}
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-      )}
 
       {/* Actions */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
-        <button onClick={onMoreLikeThis} style={{ width: "100%" }}>
-          More like this
-        </button>
-        <button
-          className="btn-primary"
+      <div className="p-6 border-t border-[var(--border)] bg-[var(--bg)] flex flex-col gap-3">
+        <Button variant="outline" className="w-full" onClick={onMoreLikeThis}>
+          Iterate Further
+        </Button>
+        <Button
+          className="w-full"
           onClick={handleMint}
           disabled={minting || !wallet}
-          style={{ width: "100%" }}
         >
-          {minting ? "Preparing mint..." : !wallet ? "Connect wallet to mint" : "Mint this"}
-        </button>
+          {minting
+            ? "Preparing..."
+            : !wallet
+            ? "Auth Required to Mint"
+            : "Inscribe to Chain"}
+        </Button>
         {mintError && (
-          <div style={{ fontSize: 12, color: "var(--danger)" }}>{mintError}</div>
+          <div className="font-mono text-[10px] text-[var(--danger)] uppercase tracking-widest">
+            {mintError}
+          </div>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }

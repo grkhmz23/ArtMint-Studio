@@ -4,21 +4,26 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center font-mono uppercase tracking-widest transition-all focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 relative overflow-hidden",
   {
     variants: {
       variant: {
-        default: "bg-accent text-white hover:bg-accent-hover",
-        secondary: "bg-card text-foreground border border-border hover:bg-card-hover",
-        ghost: "hover:bg-card-hover text-foreground",
-        destructive: "bg-danger text-white hover:bg-danger/80",
-        outline: "border border-border bg-transparent text-foreground hover:bg-card-hover",
+        default:
+          "bg-[var(--accent)] text-[var(--accent-text)] border border-[var(--accent)] hover:bg-transparent hover:text-[var(--accent)]",
+        secondary:
+          "bg-transparent border border-[var(--border)] text-[var(--text)] hover:bg-[var(--text)] hover:text-black",
+        outline:
+          "border border-[var(--accent)] bg-transparent text-[var(--accent)] hover:bg-[var(--accent)] hover:text-black",
+        ghost:
+          "bg-transparent hover:text-[var(--accent)] text-[var(--text-dim)] border border-transparent",
+        destructive:
+          "bg-[var(--danger)] text-white border border-[var(--danger)] hover:bg-transparent hover:text-[var(--danger)]",
       },
       size: {
-        default: "h-10 px-4 py-2",
-        sm: "h-8 px-3 text-xs",
-        lg: "h-12 px-6 text-base",
-        icon: "h-10 w-10",
+        sm: "h-8 px-4 text-[10px]",
+        default: "h-12 px-6 text-xs",
+        lg: "h-16 px-10 text-sm",
+        icon: "h-12 w-12",
       },
     },
     defaultVariants: {

@@ -1,7 +1,5 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-
 interface Props {
   palette: string[];
   onChange: (palette: string[]) => void;
@@ -25,34 +23,34 @@ export function PaletteEditor({ palette, onChange }: Props) {
   };
 
   return (
-    <div className="space-y-2">
-      <label className="text-xs font-medium text-muted">Palette</label>
-      <div className="flex flex-wrap items-center gap-2">
-        {palette.map((color, i) => (
-          <div key={`${i}-${color}`} className="relative group">
-            <input
-              type="color"
-              value={color}
-              onChange={(e) => updateColor(i, e.target.value)}
-              className="w-8 h-8 rounded cursor-pointer border border-border bg-transparent p-0"
-              style={{ appearance: "none", WebkitAppearance: "none" }}
-            />
-            {palette.length > 2 && (
-              <button
-                onClick={() => removeColor(i)}
-                className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-danger text-white text-[10px] leading-none hidden group-hover:flex items-center justify-center"
-              >
-                x
-              </button>
-            )}
-          </div>
-        ))}
-        {palette.length < 8 && (
-          <Button variant="outline" size="sm" onClick={addColor} className="h-8 px-2 text-xs">
-            +
-          </Button>
-        )}
-      </div>
+    <div className="flex gap-1 h-8 border border-[var(--border)] p-1 items-center">
+      {palette.map((color, i) => (
+        <div key={`${i}-${color}`} className="relative group h-full flex-1">
+          <input
+            type="color"
+            value={color}
+            onChange={(e) => updateColor(i, e.target.value)}
+            className="w-full h-full cursor-pointer border-none p-0 bg-transparent"
+            style={{ appearance: "none", WebkitAppearance: "none" }}
+          />
+          {palette.length > 2 && (
+            <button
+              onClick={() => removeColor(i)}
+              className="absolute -top-1 -right-1 w-3 h-3 text-[8px] leading-none bg-[var(--danger)] text-white hidden group-hover:flex items-center justify-center"
+            >
+              x
+            </button>
+          )}
+        </div>
+      ))}
+      {palette.length < 8 && (
+        <button
+          onClick={addColor}
+          className="h-full px-2 font-mono text-[10px] text-[var(--text-dim)] hover:text-[var(--accent)] border-l border-[var(--border)] transition-colors"
+        >
+          +
+        </button>
+      )}
     </div>
   );
 }

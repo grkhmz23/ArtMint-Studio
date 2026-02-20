@@ -29,20 +29,23 @@ export function MintButton({ onMint, disabled }: Props) {
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <Button
         onClick={handleMint}
         disabled={disabled || loading}
         className="w-full"
-        size="lg"
       >
-        {loading ? "Minting..." : "Mint NFT"}
+        {loading ? "Inscribing..." : "Initialize Mint"}
       </Button>
       {error && (
-        <p className="text-xs text-danger">{error}</p>
+        <p className="font-mono text-[10px] text-[var(--danger)] uppercase tracking-widest">
+          {error}
+        </p>
       )}
       {success && (
-        <p className="text-xs text-success">Mint prepared successfully!</p>
+        <p className="font-mono text-[10px] text-[var(--success)] uppercase tracking-widest">
+          Inscription confirmed.
+        </p>
       )}
     </div>
   );

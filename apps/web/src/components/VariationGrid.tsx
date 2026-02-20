@@ -2,6 +2,9 @@
 
 import type { Variation } from "@artmint/common";
 import { ArtPreview } from "./ArtPreview";
+import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
+import { fadeUp, staggerContainer } from "@/lib/animations";
 
 interface Props {
   variations: Variation[];
@@ -11,37 +14,33 @@ interface Props {
 
 export function VariationGrid({ variations, selectedIndex, onSelect }: Props) {
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-        gap: 12,
-      }}
+    <motion.div
+      variants={staggerContainer}
+      initial="hidden"
+      animate="show"
+      className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-px bg-[var(--border)] border border-[var(--border)]"
     >
       {variations.map((v, i) => (
-        <div
-          key={`${v.templateId}-${v.seed}`}
-          onClick={() => onSelect(i)}
-          style={{
-            cursor: "pointer",
-            border: `2px solid ${selectedIndex === i ? "var(--accent)" : "var(--border)"}`,
-            borderRadius: 8,
-            overflow: "hidden",
-            background: "var(--bg-card)",
-            transition: "border-color 0.15s",
-          }}
-        >
-          <ArtPreview variation={v} size={300} />
-          <div style={{ padding: "8px 10px" }}>
-            <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 2 }}>
-              {v.title ?? `${v.templateId} #${v.seed}`}
+        <motion.div key={`${v.templateId}-${v.seed}`} variants={fadeUp} className="bg-[var(--bg)] group">
+          <div
+            className={cn(
+              "p-4 cursor-pointer transition-colors relative h-full flex flex-col",
+              selectedIndex === i
+                ? "bg-[var(--bg-hover)]"
+                : "hover:bg-[var(--bg-card)]"
+            )}
+            onClick={() => onSelect(i)}
+          >
+            <div className="flex justify-between items-center mb-3 font-mono text-[10px] text-[var(--text-dim)] uppercase">
+              <span>{v.title ?? v.templateId}</span>
+              <span className="text-[var(--accent)]">#{v.seed}</span>
             </div>
-            <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
-              seed: {v.seed}
+            <div className="aspect-square bg-black border border-[var(--border)] overflow-hidden">
+              <ArtPreview variation={v} size={300} />
             </div>
           </div>
-        </div>
+        </motion.div>
       ))}
-    </div>
+    </motion.div>
   );
 }

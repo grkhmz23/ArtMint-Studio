@@ -4,6 +4,10 @@ const config: Config = {
   content: ["./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
+      fontFamily: {
+        mono: ["'Space Mono'", "monospace"],
+        serif: ["'Playfair Display'", "serif"],
+      },
       colors: {
         background: "var(--bg)",
         foreground: "var(--text)",

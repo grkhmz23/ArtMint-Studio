@@ -1,9 +1,14 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
-import { useWallet, useConnection } from "@solana/wallet-adapter-react";
+import { useWallet } from "@solana/wallet-adapter-react";
 import { Header } from "@/components/Header";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { motion } from "framer-motion";
+import { fadeUp } from "@/lib/animations";
 import type { CanonicalInput } from "@artmint/common";
+import { cn } from "@/lib/utils";
 
 interface MintData {
   id: string;
@@ -30,7 +35,6 @@ interface MintData {
 
 export function AssetClient({ mint }: { mint: MintData }) {
   const { publicKey } = useWallet();
-  const { connection } = useConnection();
   const [listPrice, setListPrice] = useState("");
   const [listing, setListing] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
@@ -52,15 +56,9 @@ export function AssetClient({ mint }: { mint: MintData }) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  /**
-   * Client-side 4K export: fetch the SVG from the render API at 1080px,
-   * then render it to a canvas at 3840px and export as PNG.
-   * This avoids needing the server to render at 3840.
-   */
   const handleExport4K = useCallback(async () => {
     if (!canonicalInput) return;
     setExporting(true);
-
     try {
       const params = encodeURIComponent(
         JSON.stringify({
@@ -71,16 +69,13 @@ export function AssetClient({ mint }: { mint: MintData }) {
           format: "svg",
         })
       );
-
       const res = await fetch(`/api/render?data=${params}`);
       if (!res.ok) throw new Error("Failed to fetch SVG");
       const svgText = await res.text();
-
       const SIZE = 3840;
       const blob = new Blob([svgText], { type: "image/svg+xml" });
       const url = URL.createObjectURL(blob);
       const img = new Image();
-
       img.onload = () => {
         const canvas = document.createElement("canvas");
         canvas.width = SIZE;
@@ -92,7 +87,6 @@ export function AssetClient({ mint }: { mint: MintData }) {
         }
         ctx.drawImage(img, 0, 0, SIZE, SIZE);
         URL.revokeObjectURL(url);
-
         canvas.toBlob(
           (pngBlob) => {
             if (!pngBlob) {
@@ -109,12 +103,10 @@ export function AssetClient({ mint }: { mint: MintData }) {
           "image/png"
         );
       };
-
       img.onerror = () => {
         URL.revokeObjectURL(url);
         setExporting(false);
       };
-
       img.src = url;
     } catch {
       setExporting(false);
@@ -122,24 +114,19 @@ export function AssetClient({ mint }: { mint: MintData }) {
   }, [canonicalInput]);
 
   const handleRerender4K = () => {
-    // Open the HTML artifact in a new tab — it has built-in 4K export too
     window.open(mint.animationUrl, "_blank");
   };
 
   const handleListBuyNow = async () => {
     if (!publicKey || !listPrice) return;
-
     const priceLamports = Math.floor(parseFloat(listPrice) * 1e9);
     if (isNaN(priceLamports) || priceLamports <= 0) {
       setListError("Enter a valid price in SOL");
       return;
     }
-
     setListing(true);
     setListError(null);
-
     try {
-      // Wallet comes from session cookie — no need to send in body
       const res = await fetch("/api/listing", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -149,12 +136,10 @@ export function AssetClient({ mint }: { mint: MintData }) {
           status: "active",
         }),
       });
-
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error ?? "Listing failed");
       }
-
       window.location.reload();
     } catch (err) {
       setListError(err instanceof Error ? err.message : "Listing failed");
@@ -163,227 +148,218 @@ export function AssetClient({ mint }: { mint: MintData }) {
     }
   };
 
+  const provenanceRows = [
+    { label: "Algorithm", value: canonicalInput?.templateId ?? "---" },
+    { label: "Seed Config", value: String(canonicalInput?.seed ?? "---") },
+    { label: "Core Engine", value: canonicalInput?.rendererVersion ?? "---" },
+    { label: "Tx Hash", value: mint.hash.slice(0, 8) + "..." + mint.hash.slice(-4) },
+  ];
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+    <div className="flex flex-col min-h-screen">
       <Header />
-      <div className="container" style={{ padding: "32px 24px", display: "flex", gap: 32, flexWrap: "wrap" }}>
-        {/* Left: Artwork */}
-        <div style={{ flex: "1 1 500px" }}>
-          <div style={{ marginBottom: 16, display: "flex", gap: 8 }}>
-            <button
-              onClick={() => setShowLive(false)}
-              style={{
-                background: !showLive ? "var(--accent)" : "var(--bg-card)",
-                borderColor: !showLive ? "var(--accent)" : "var(--border)",
-                color: !showLive ? "white" : "var(--text-dim)",
-              }}
-            >
-              PNG Preview
-            </button>
-            <button
-              onClick={() => setShowLive(true)}
-              style={{
-                background: showLive ? "var(--accent)" : "var(--bg-card)",
-                borderColor: showLive ? "var(--accent)" : "var(--border)",
-                color: showLive ? "white" : "var(--text-dim)",
-              }}
-            >
-              Live Render
-            </button>
-          </div>
+      <div className="noise-overlay" />
 
-          <div
-            style={{
-              border: "1px solid var(--border)",
-              borderRadius: 12,
-              overflow: "hidden",
-              background: "#0a0a0f",
-              aspectRatio: "1/1",
-              maxWidth: 600,
-            }}
-          >
-            {showLive ? (
-              <iframe
-                src={mint.animationUrl}
-                sandbox="allow-scripts"
-                style={{ width: "100%", height: "100%", border: "none" }}
-                title="Live render"
-              />
-            ) : (
-              <img
-                src={mint.imageUrl}
-                alt={mint.title ?? "Artwork"}
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              />
-            )}
-          </div>
-        </div>
-
-        {/* Right: Info + Provenance */}
-        <div style={{ flex: "1 1 350px", maxWidth: 500 }}>
-          <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 8 }}>
-            {mint.title ?? `ArtMint #${canonicalInput?.seed ?? ""}`}
-          </h1>
-          <p style={{ color: "var(--text-dim)", fontSize: 13, marginBottom: 24 }}>
-            Mint: {mint.mintAddress}
-          </p>
-
-          {/* Provenance Panel */}
-          <div
-            style={{
-              background: "var(--bg-card)",
-              border: "1px solid var(--border)",
-              borderRadius: 12,
-              padding: 20,
-              marginBottom: 24,
-            }}
-          >
-            <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>
-              Provenance
-            </h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <ProvenanceRow label="Prompt" value={canonicalInput?.prompt ?? "—"} />
-              <ProvenanceRow label="Template" value={canonicalInput?.templateId ?? "—"} />
-              <ProvenanceRow label="Seed" value={String(canonicalInput?.seed ?? "—")} />
-              <ProvenanceRow label="Renderer" value={canonicalInput?.rendererVersion ?? "—"} />
-              <ProvenanceRow label="Hash" value={mint.hash} mono />
-              <div>
-                <span style={{ fontSize: 12, color: "var(--text-dim)", display: "block", marginBottom: 4 }}>
-                  Palette
-                </span>
-                <div style={{ display: "flex", gap: 4 }}>
-                  {(canonicalInput?.palette ?? []).map((c, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        width: 24,
-                        height: 24,
-                        borderRadius: 4,
-                        background: c,
-                        border: "1px solid var(--border)",
-                      }}
-                      title={c}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-              <button onClick={handleCopyParams} style={{ fontSize: 12, flex: 1 }}>
-                {copied ? "Copied!" : "Copy params"}
+      <div className="max-w-[1400px] mx-auto w-full p-6 lg:p-12">
+        <div className="flex flex-col lg:flex-row gap-12 lg:gap-24 items-center lg:items-start">
+          {/* Artwork Display */}
+          <div className="flex-1 w-full max-w-[800px]">
+            {/* View toggle */}
+            <div className="flex gap-2 mb-4">
+              <button
+                onClick={() => setShowLive(false)}
+                className={cn(
+                  "font-mono text-[10px] uppercase tracking-widest px-4 py-2 border transition-colors",
+                  !showLive
+                    ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/5"
+                    : "border-[var(--border)] text-[var(--text-dim)] hover:text-white"
+                )}
+              >
+                Static
               </button>
               <button
-                onClick={handleExport4K}
-                disabled={exporting}
-                style={{ fontSize: 12, flex: 1 }}
+                onClick={() => setShowLive(true)}
+                className={cn(
+                  "font-mono text-[10px] uppercase tracking-widest px-4 py-2 border transition-colors",
+                  showLive
+                    ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/5"
+                    : "border-[var(--border)] text-[var(--text-dim)] hover:text-white"
+                )}
               >
-                {exporting ? "Exporting..." : "Export 4K PNG"}
-              </button>
-              <button onClick={handleRerender4K} style={{ fontSize: 12, flex: 1 }}>
-                Open Artifact
+                Live Render
               </button>
             </div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8 }}
+              className="aspect-square bg-black border border-[var(--border)] relative p-2 md:p-6 pb-12 md:pb-20"
+            >
+              {showLive ? (
+                <iframe
+                  src={mint.animationUrl}
+                  sandbox="allow-scripts"
+                  className="w-full h-full border-none"
+                  title="Live render"
+                />
+              ) : (
+                <img
+                  src={mint.imageUrl}
+                  alt={mint.title ?? "Artwork"}
+                  className="w-full h-full object-cover shadow-2xl"
+                />
+              )}
+              <div className="absolute bottom-4 left-6 right-6 flex justify-between items-end">
+                <span className="font-serif text-2xl italic text-white/50">
+                  {mint.title ?? `ArtMint #${canonicalInput?.seed ?? ""}`}
+                </span>
+                <span className="font-mono text-[10px] text-[var(--text-dim)] uppercase tracking-widest">
+                  1/1 Edition
+                </span>
+              </div>
+            </motion.div>
           </div>
 
-          {/* Listing UI */}
-          <div
-            style={{
-              background: "var(--bg-card)",
-              border: "1px solid var(--border)",
-              borderRadius: 12,
-              padding: 20,
-            }}
-          >
-            <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>
-              Listing
-            </h3>
+          {/* Info & Actions */}
+          <div className="w-full lg:w-[400px] shrink-0 space-y-12">
+            <motion.div
+              initial="hidden"
+              animate="show"
+              variants={fadeUp}
+              className="border-b border-[var(--border)] pb-8"
+            >
+              <h1 className="font-serif text-5xl text-white mb-4">
+                {mint.title ?? `ArtMint #${canonicalInput?.seed ?? ""}`}
+              </h1>
+              <p className="font-mono text-xs text-[var(--accent)] uppercase tracking-widest bg-[var(--accent)]/10 px-3 py-1 inline-block border border-[var(--accent)]">
+                Address: {mint.mintAddress.slice(0, 6)}...{mint.mintAddress.slice(-4)}
+              </p>
+            </motion.div>
 
-            {mint.listing ? (
-              <div>
-                <div style={{ fontSize: 14, marginBottom: 8 }}>
-                  Status:{" "}
-                  <span
-                    style={{
-                      color:
-                        mint.listing.status === "active"
-                          ? "var(--success)"
-                          : "var(--text-dim)",
-                      fontWeight: 600,
-                    }}
+            {/* Provenance */}
+            <motion.div
+              initial="hidden"
+              animate="show"
+              variants={fadeUp}
+              className="space-y-6 font-mono text-xs uppercase tracking-widest"
+            >
+              <h3 className="text-[10px] text-[var(--text-dim)] border-b border-[var(--border)] pb-2">
+                Provenance Metadata
+              </h3>
+              <div className="space-y-4">
+                {provenanceRows.map((row, i) => (
+                  <div
+                    key={i}
+                    className="flex justify-between items-end border-b border-[var(--border)]/30 pb-1"
                   >
-                    {mint.listing.status}
-                  </span>
-                </div>
-                <div style={{ fontSize: 14 }}>
-                  Price: {(Number(mint.listing.priceLamports) / 1e9).toFixed(4)} SOL
-                </div>
-                {mint.listing.txSignature && (
-                  <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 8 }}>
-                    TX: {mint.listing.txSignature}
+                    <span className="text-[var(--text-dim)]">{row.label}</span>
+                    <span className="text-white text-right">{row.value}</span>
                   </div>
-                )}
+                ))}
               </div>
-            ) : (
-              <div>
-                <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="Price in SOL"
-                    value={listPrice}
-                    onChange={(e) => setListPrice(e.target.value)}
-                    style={{ flex: 1 }}
-                  />
-                  <button
-                    className="btn-success"
+              {canonicalInput?.palette && (
+                <div>
+                  <span className="text-[10px] text-[var(--text-dim)] block mb-2">
+                    Palette
+                  </span>
+                  <div className="flex gap-1 h-6 border border-[var(--border)] p-0.5">
+                    {canonicalInput.palette.map((c, i) => (
+                      <div
+                        key={i}
+                        className="flex-1 h-full"
+                        style={{ backgroundColor: c }}
+                        title={c}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </motion.div>
+
+            {/* Listing */}
+            <motion.div initial="hidden" animate="show" variants={fadeUp} className="space-y-4 pt-4">
+              {mint.listing ? (
+                <div className="border border-[var(--success)] p-6 bg-[var(--success)]/5">
+                  <div className="font-mono text-[10px] text-[var(--success)] uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 bg-[var(--success)] rounded-full" />
+                    {mint.listing.status}
+                  </div>
+                  <div className="font-serif text-4xl text-white mb-6">
+                    {(Number(mint.listing.priceLamports) / 1e9).toFixed(2)} SOL
+                  </div>
+                  {mint.listing.txSignature && (
+                    <div className="font-mono text-[10px] text-[var(--text-dim)] mb-4">
+                      TX: {mint.listing.txSignature}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="border border-[var(--border)] p-6">
+                  <label className="font-mono text-[10px] text-[var(--text-dim)] uppercase tracking-widest block mb-4">
+                    Initialize Listing
+                  </label>
+                  <div className="flex gap-2 mb-6">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      value={listPrice}
+                      onChange={(e) => setListPrice(e.target.value)}
+                      className="text-xl text-center"
+                    />
+                    <div className="border border-[var(--border)] flex items-center px-4 font-mono text-xs uppercase tracking-widest shrink-0">
+                      SOL
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="w-full"
                     onClick={handleListBuyNow}
                     disabled={listing || !publicKey || !listPrice}
                   >
-                    {listing ? "Listing..." : "List Buy Now"}
-                  </button>
+                    {listing ? "Listing..." : "List Asset"}
+                  </Button>
+                  {listError && (
+                    <div className="font-mono text-[10px] text-[var(--danger)] mt-2">
+                      {listError}
+                    </div>
+                  )}
+                  {!publicKey && (
+                    <div className="font-mono text-[10px] text-[var(--text-dim)] mt-2">
+                      Connect wallet to list
+                    </div>
+                  )}
                 </div>
-                {listError && (
-                  <div style={{ fontSize: 12, color: "var(--danger)" }}>{listError}</div>
-                )}
-                {!publicKey && (
-                  <div style={{ fontSize: 12, color: "var(--text-dim)" }}>
-                    Connect wallet to list
-                  </div>
-                )}
-              </div>
-            )}
+              )}
+            </motion.div>
+
+            {/* Action buttons */}
+            <motion.div initial="hidden" animate="show" variants={fadeUp} className="flex gap-4">
+              <button
+                onClick={handleExport4K}
+                disabled={exporting}
+                className="flex-1 border border-[var(--border)] py-3 font-mono text-[10px] uppercase tracking-widest text-[var(--text-dim)] hover:text-white hover:border-white transition-colors disabled:opacity-50"
+              >
+                {exporting ? "Exporting..." : "Download 4K"}
+              </button>
+              <button
+                onClick={handleCopyParams}
+                className="flex-1 border border-[var(--border)] py-3 font-mono text-[10px] uppercase tracking-widest text-[var(--text-dim)] hover:text-white hover:border-white transition-colors"
+              >
+                {copied ? "Copied!" : "Extract Source"}
+              </button>
+              <button
+                onClick={handleRerender4K}
+                className="flex-1 border border-[var(--border)] py-3 font-mono text-[10px] uppercase tracking-widest text-[var(--text-dim)] hover:text-white hover:border-white transition-colors"
+              >
+                Open Artifact
+              </button>
+            </motion.div>
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function ProvenanceRow({
-  label,
-  value,
-  mono = false,
-}: {
-  label: string;
-  value: string;
-  mono?: boolean;
-}) {
-  return (
-    <div>
-      <span style={{ fontSize: 12, color: "var(--text-dim)", display: "block", marginBottom: 2 }}>
-        {label}
-      </span>
-      <span
-        style={{
-          fontSize: 13,
-          fontFamily: mono ? "monospace" : "inherit",
-          wordBreak: "break-all",
-        }}
-      >
-        {value}
-      </span>
     </div>
   );
 }

@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 import { Header } from "@/components/Header";
+import { Button } from "@/components/ui/button";
+import { motion } from "framer-motion";
+import { fadeUp, staggerContainer } from "@/lib/animations";
+import { ArrowRight } from "lucide-react";
 
 interface MintItem {
   id: string;
@@ -24,76 +28,108 @@ export function ProfileClient({
   mints: MintItem[];
 }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+    <div className="flex flex-col min-h-screen">
       <Header />
-      <div className="container" style={{ padding: "32px 24px" }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Profile</h1>
-        <p style={{ color: "var(--text-dim)", fontSize: 13, marginBottom: 32, wordBreak: "break-all" }}>
-          {wallet}
-        </p>
+      <div className="noise-overlay" />
+
+      <div className="max-w-[1400px] mx-auto w-full p-6 lg:p-12">
+        {/* Identity Banner */}
+        <div className="border-b border-[var(--border)] pb-12 mb-12 flex flex-col md:flex-row justify-between items-end gap-6">
+          <div>
+            <h1 className="font-serif text-5xl md:text-7xl text-white italic mb-4">
+              Your Archive.
+            </h1>
+            <p className="font-mono text-xs text-[var(--accent)] uppercase tracking-widest bg-[var(--accent)]/10 px-3 py-1 inline-block border border-[var(--accent)]">
+              Identity: {wallet.slice(0, 6)}...{wallet.slice(-4)}
+            </p>
+          </div>
+          <div className="font-mono text-xs uppercase tracking-widest text-right">
+            <div className="text-[var(--text-dim)] mb-1">Total Assets</div>
+            <div className="text-2xl text-white">{mints.length}</div>
+          </div>
+        </div>
 
         {mints.length === 0 ? (
-          <div style={{ textAlign: "center", padding: 60, color: "var(--text-dim)" }}>
-            <p>No minted items yet.</p>
+          <div className="flex flex-col items-center justify-center py-32 text-center">
+            <p className="font-serif text-5xl italic text-[var(--border)] mb-6">
+              Empty Archive
+            </p>
+            <p className="font-mono text-xs text-[var(--text-dim)] uppercase tracking-widest mb-8">
+              No inscriptions recorded. Initialize your first piece.
+            </p>
             <Link href="/studio">
-              <button className="btn-primary" style={{ marginTop: 16 }}>
-                Go to Studio
-              </button>
+              <Button size="lg" className="gap-3">
+                Enter Studio <ArrowRight size={14} />
+              </Button>
             </Link>
           </div>
         ) : (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-              gap: 16,
-            }}
-          >
-            {mints.map((m) => (
-              <Link key={m.id} href={`/asset/${m.mintAddress}`}>
-                <div
-                  style={{
-                    border: "1px solid var(--border)",
-                    borderRadius: 12,
-                    overflow: "hidden",
-                    background: "var(--bg-card)",
-                    transition: "border-color 0.15s",
-                    cursor: "pointer",
-                  }}
+          <div>
+            <div className="flex justify-between items-center mb-8">
+              <h2 className="font-mono text-[10px] text-[var(--text-dim)] uppercase tracking-widest">
+                Portfolio Matrix
+              </h2>
+            </div>
+
+            <motion.div
+              variants={staggerContainer}
+              initial="hidden"
+              animate="show"
+              className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-px bg-[var(--border)] border border-[var(--border)]"
+            >
+              {mints.map((m) => (
+                <motion.div
+                  key={m.id}
+                  variants={fadeUp}
+                  className="bg-[var(--bg)] group cursor-pointer"
                 >
-                  <div style={{ aspectRatio: "1/1", background: "#0a0a0f" }}>
-                    <img
-                      src={m.imageUrl}
-                      alt={m.title ?? "Artwork"}
-                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                    />
-                  </div>
-                  <div style={{ padding: 12 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>
-                      {m.title ?? "Untitled"}
-                    </div>
-                    <div style={{ fontSize: 11, color: "var(--text-dim)", marginBottom: 4 }}>
-                      {m.mintAddress.slice(0, 12)}...
-                    </div>
-                    {m.listing && (
-                      <div style={{ fontSize: 12, display: "flex", justifyContent: "space-between" }}>
-                        <span
-                          style={{
-                            color:
-                              m.listing.status === "active"
-                                ? "var(--success)"
-                                : "var(--text-dim)",
-                          }}
-                        >
-                          {m.listing.status}
-                        </span>
-                        <span>{(Number(m.listing.priceLamports) / 1e9).toFixed(2)} SOL</span>
+                  <Link
+                    href={`/asset/${m.mintAddress}`}
+                    className="p-4 flex flex-col h-full hover:bg-[var(--bg-card)] transition-colors block no-underline"
+                  >
+                    <div className="aspect-square bg-black border border-[var(--border)] relative overflow-hidden mb-4 p-2">
+                      <div className="absolute top-1 left-1 font-mono text-[9px] text-[var(--text-dim)] z-10">
+                        [{m.mintAddress.slice(0, 6)}]
                       </div>
-                    )}
-                  </div>
-                </div>
-              </Link>
-            ))}
+                      <img
+                        src={m.imageUrl}
+                        alt={m.title ?? "Artwork"}
+                        className="w-full h-full object-cover filter grayscale opacity-80 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-700"
+                      />
+                    </div>
+
+                    <h3 className="font-serif text-xl text-white mb-2 group-hover:text-[var(--accent)] transition-colors">
+                      {m.title ?? "Untitled"}
+                    </h3>
+
+                    <div className="mt-auto pt-4 border-t border-[var(--border)] flex justify-between items-end font-mono uppercase tracking-widest">
+                      {m.listing?.status === "active" ? (
+                        <>
+                          <span className="text-[9px] text-[var(--success)]">
+                            Market
+                          </span>
+                          <span className="text-xs text-white">
+                            {(
+                              Number(m.listing.priceLamports) / 1e9
+                            ).toFixed(2)}{" "}
+                            SOL
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-[9px] text-[var(--text-dim)]">
+                            Vault
+                          </span>
+                          <span className="text-xs text-[var(--text-dim)]">
+                            ---
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </Link>
+                </motion.div>
+              ))}
+            </motion.div>
           </div>
         )}
       </div>

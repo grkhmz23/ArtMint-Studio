@@ -1,67 +1,125 @@
+"use client";
+
 import Link from "next/link";
+import { motion } from "framer-motion";
+import { Sparkles, Sliders, Code2, ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { fadeUp, staggerContainer } from "@/lib/animations";
+
+const features = [
+  {
+    title: "Generative AI",
+    desc: "Latent space exploration via prompt engineering.",
+    link: "/studio",
+    icon: Sparkles,
+  },
+  {
+    title: "Parametric Control",
+    desc: "Granular manipulation of algorithmic variables.",
+    link: "/studio/manual",
+    icon: Sliders,
+  },
+  {
+    title: "Raw Canvas",
+    desc: "Direct JS/SVG manipulation environment.",
+    link: "/studio/code",
+    icon: Code2,
+  },
+];
 
 export default function Home() {
   return (
-    <div className="container" style={{ paddingTop: 80, textAlign: "center" }}>
-      <h1 style={{ fontSize: 48, fontWeight: 700, marginBottom: 16 }}>
-        ArtMint Studio
-      </h1>
-      <p style={{ color: "var(--text-dim)", fontSize: 18, marginBottom: 40, maxWidth: 600, margin: "0 auto 40px" }}>
-        AI-powered generative art director. Type a prompt, explore variations,
-        mint deterministic art on Solana, and list on Exchange Art.
-      </p>
-      <div style={{ display: "flex", gap: 16, justifyContent: "center" }}>
-        <Link href="/studio">
-          <button className="btn-primary" style={{ fontSize: 18, padding: "14px 32px" }}>
-            Open Studio
-          </button>
-        </Link>
-        <Link href="/dashboard">
-          <button style={{ fontSize: 18, padding: "14px 32px" }}>
-            Dashboard
-          </button>
-        </Link>
-      </div>
-      <div style={{ marginTop: 60, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 24, maxWidth: 1000, margin: "60px auto 0" }}>
-        <div style={{ padding: 24, background: "var(--bg-card)", borderRadius: 12, border: "1px solid var(--border)" }}>
-          <h3 style={{ marginBottom: 8 }}>Generate</h3>
-          <p style={{ color: "var(--text-dim)", fontSize: 14 }}>
-            AI creates parameterized variations from your prompt
-          </p>
-          <Link href="/studio" style={{ color: "var(--accent)", fontSize: 13, marginTop: 12, display: "inline-block" }}>
-            Open AI Studio
-          </Link>
-        </div>
-        <div style={{ padding: 24, background: "var(--bg-card)", borderRadius: 12, border: "1px solid var(--border)" }}>
-          <h3 style={{ marginBottom: 8 }}>Manual</h3>
-          <p style={{ color: "var(--text-dim)", fontSize: 14 }}>
-            Tweak template parameters with sliders for direct control
-          </p>
-          <Link href="/studio/manual" style={{ color: "var(--accent)", fontSize: 13, marginTop: 12, display: "inline-block" }}>
-            Open Parameter Editor
-          </Link>
-        </div>
-        <div style={{ padding: 24, background: "var(--bg-card)", borderRadius: 12, border: "1px solid var(--border)" }}>
-          <h3 style={{ marginBottom: 8 }}>Code</h3>
-          <p style={{ color: "var(--text-dim)", fontSize: 14 }}>
-            Write custom JavaScript drawing code with live canvas preview
-          </p>
-          <Link href="/studio/code" style={{ color: "var(--accent)", fontSize: 13, marginTop: 12, display: "inline-block" }}>
-            Open Code Editor
-          </Link>
-        </div>
-        <div style={{ padding: 24, background: "var(--bg-card)", borderRadius: 12, border: "1px solid var(--border)" }}>
-          <h3 style={{ marginBottom: 8 }}>Mint</h3>
-          <p style={{ color: "var(--text-dim)", fontSize: 14 }}>
-            Deterministic SVG art with full provenance on-chain
-          </p>
-        </div>
-        <div style={{ padding: 24, background: "var(--bg-card)", borderRadius: 12, border: "1px solid var(--border)" }}>
-          <h3 style={{ marginBottom: 8 }}>Sell</h3>
-          <p style={{ color: "var(--text-dim)", fontSize: 14 }}>
-            List on Exchange Art marketplace with one click
-          </p>
-        </div>
+    <div className="flex-1 flex flex-col items-center justify-center p-6 py-20 lg:py-32 relative overflow-hidden min-h-screen">
+      {/* Noise overlay */}
+      <div className="noise-overlay" />
+
+      {/* Decorative background grid */}
+      <div
+        className="absolute inset-0 pointer-events-none opacity-20"
+        style={{
+          backgroundImage:
+            "linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px)",
+          backgroundSize: "100px 100px",
+          backgroundPosition: "center center",
+        }}
+      />
+
+      <div className="max-w-[1200px] w-full flex flex-col items-center text-center relative z-10">
+        <motion.div
+          initial="hidden"
+          animate="show"
+          variants={staggerContainer}
+          className="space-y-8 flex flex-col items-center"
+        >
+          {/* Title */}
+          <motion.div variants={fadeUp} className="relative">
+            <h1 className="font-serif text-7xl md:text-[140px] leading-none tracking-tight text-white mb-4 italic pr-8">
+              ArtMint
+            </h1>
+            <div className="absolute bottom-4 right-0 font-mono text-xl md:text-3xl uppercase tracking-[0.3em] text-[var(--accent)] bg-[var(--bg)] px-2">
+              Studio
+            </div>
+          </motion.div>
+
+          <motion.p
+            variants={fadeUp}
+            className="font-mono text-xs md:text-sm text-[var(--text-dim)] max-w-[500px] leading-relaxed uppercase tracking-widest"
+          >
+            The intersection of algorithmic logic and fine art. Parameterize,
+            generate, and immortalize deterministic artworks on the Solana
+            protocol.
+          </motion.p>
+
+          <motion.div
+            variants={fadeUp}
+            className="flex flex-col sm:flex-row gap-6 pt-12"
+          >
+            <Link href="/studio">
+              <Button size="lg">Enter Studio</Button>
+            </Link>
+            <Link href="/dashboard">
+              <Button size="lg" variant="secondary">
+                View Archives
+              </Button>
+            </Link>
+          </motion.div>
+        </motion.div>
+
+        {/* Feature Grid */}
+        <motion.div
+          initial="hidden"
+          animate="show"
+          variants={staggerContainer}
+          className="grid grid-cols-1 md:grid-cols-3 gap-px bg-[var(--border)] mt-32 w-full border border-[var(--border)]"
+        >
+          {features.map((f, i) => (
+            <motion.div
+              key={i}
+              variants={fadeUp}
+              className="bg-[var(--bg)] p-10 hover:bg-[var(--bg-card)] transition-colors group relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-100 group-hover:text-[var(--accent)] transition-all transform group-hover:scale-110">
+                <f.icon size={120} strokeWidth={0.5} />
+              </div>
+              <h3 className="font-serif text-2xl text-white mb-4 relative z-10">
+                {f.title}
+              </h3>
+              <p className="font-mono text-xs text-[var(--text-dim)] leading-relaxed uppercase tracking-widest mb-12 max-w-[200px] relative z-10">
+                {f.desc}
+              </p>
+              <Link
+                href={f.link}
+                className="font-mono text-xs text-white group-hover:text-[var(--accent)] transition-colors flex items-center gap-3 tracking-widest uppercase relative z-10 no-underline"
+              >
+                Initialize{" "}
+                <ArrowRight
+                  size={14}
+                  className="group-hover:translate-x-2 transition-transform"
+                />
+              </Link>
+            </motion.div>
+          ))}
+        </motion.div>
       </div>
     </div>
   );

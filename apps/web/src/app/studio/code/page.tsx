@@ -3,7 +3,11 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Header } from "@/components/Header";
 import { CodeEditor } from "@/components/studio/CodeEditor";
-import { CodePreview, type CodePreviewHandle, type CodeMode } from "@/components/studio/CodePreview";
+import {
+  CodePreview,
+  type CodePreviewHandle,
+  type CodeMode,
+} from "@/components/studio/CodePreview";
 import { SeedInput } from "@/components/studio/SeedInput";
 import { PaletteEditor } from "@/components/studio/PaletteEditor";
 import { useAuth } from "@/lib/use-auth";
@@ -11,6 +15,9 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { presets } from "@artmint/common";
 import { starterSvgCode, starterJsCode } from "@/components/studio/starterCode";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+import { Play, TerminalSquare, X } from "lucide-react";
 
 export default function CodeStudioPage() {
   const { publicKey } = useWallet();
@@ -19,7 +26,9 @@ export default function CodeStudioPage() {
   const [mode, setMode] = useState<CodeMode>("svg");
   const [code, setCode] = useState(starterSvgCode);
   const [liveCode, setLiveCode] = useState(starterSvgCode);
-  const [seed, setSeed] = useState(() => Math.floor(Math.random() * 999999999));
+  const [seed, setSeed] = useState(() =>
+    Math.floor(Math.random() * 999999999)
+  );
   const [palette, setPalette] = useState<string[]>(presets[0]!.defaultPalette);
   const [title, setTitle] = useState("");
   const [renderError, setRenderError] = useState<string | null>(null);
@@ -30,7 +39,6 @@ export default function CodeStudioPage() {
   const previewRef = useRef<CodePreviewHandle>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Debounced auto-preview: update liveCode 800ms after code stops changing
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
@@ -57,20 +65,16 @@ export default function CodeStudioPage() {
 
   const handleMint = async () => {
     if (renderError) return;
-
     const preview = previewRef.current;
     if (!preview) {
       setMintError("Preview not ready");
       return;
     }
-
     setMintLoading(true);
     setMintError(null);
     setMintSuccess(false);
-
     try {
       const dataUrl = await preview.capture();
-
       const res = await fetch("/api/mint/custom", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -83,12 +87,10 @@ export default function CodeStudioPage() {
           pngBase64: dataUrl,
         }),
       });
-
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error ?? "Mint failed");
       }
-
       setMintSuccess(true);
     } catch (err) {
       setMintError(err instanceof Error ? err.message : "Mint failed");
@@ -103,119 +105,167 @@ export default function CodeStudioPage() {
   return (
     <div className="flex flex-col h-screen">
       <Header />
+      <div className="noise-overlay" />
 
-      {/* Top toolbar */}
-      <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border bg-card flex-shrink-0 flex-wrap">
-        {/* Mode toggle */}
-        <div className="flex rounded-md border border-border overflow-hidden">
-          <button
-            onClick={() => handleModeSwitch("svg")}
-            className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-              mode === "svg"
-                ? "bg-accent text-white"
-                : "bg-card text-muted hover:text-foreground"
-            }`}
-          >
-            SVG
-          </button>
-          <button
-            onClick={() => handleModeSwitch("javascript")}
-            className={`px-3 py-1.5 text-xs font-medium transition-colors border-l border-border ${
-              mode === "javascript"
-                ? "bg-accent text-white"
-                : "bg-card text-muted hover:text-foreground"
-            }`}
-          >
-            JavaScript
-          </button>
+      {/* Editorial IDE Toolbar */}
+      <div className="h-14 border-b border-[var(--border)] bg-[var(--bg)] flex items-center px-6 justify-between shrink-0 z-10">
+        <div className="flex items-center gap-8">
+          <div className="font-serif text-xl italic text-white pr-6 border-r border-[var(--border)]">
+            Terminal.
+          </div>
+          <div className="flex font-mono text-[10px] uppercase tracking-widest border border-[var(--border)] p-1 bg-[var(--bg-card)]">
+            <button
+              className={cn(
+                "px-4 py-1 transition-colors",
+                mode === "svg"
+                  ? "bg-[var(--text)] text-black"
+                  : "text-[var(--text-dim)] hover:text-white"
+              )}
+              onClick={() => handleModeSwitch("svg")}
+            >
+              SVG Markup
+            </button>
+            <button
+              className={cn(
+                "px-4 py-1 transition-colors",
+                mode === "javascript"
+                  ? "bg-[var(--text)] text-black"
+                  : "text-[var(--text-dim)] hover:text-white"
+              )}
+              onClick={() => handleModeSwitch("javascript")}
+            >
+              Canvas API
+            </button>
+          </div>
+
+          {/* Seed + Palette for JS mode */}
+          {mode === "javascript" && (
+            <div className="flex items-center gap-4">
+              <div className="w-32">
+                <SeedInput seed={seed} onChange={setSeed} />
+              </div>
+              <div className="w-48">
+                <PaletteEditor palette={palette} onChange={setPalette} />
+              </div>
+            </div>
+          )}
+
+          <div className="w-32">
+            <Input
+              placeholder="Title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="h-8 text-[10px] tracking-widest"
+              maxLength={200}
+            />
+          </div>
         </div>
 
-        {/* Seed (only for JS mode) */}
-        {mode === "javascript" && (
-          <SeedInput seed={seed} onChange={setSeed} />
-        )}
-
-        {/* Palette (only for JS mode) */}
-        {mode === "javascript" && (
-          <PaletteEditor palette={palette} onChange={setPalette} />
-        )}
-
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Title (optional)"
-          className="h-8 px-2 rounded-md border border-border bg-background text-foreground text-xs w-40"
-          maxLength={200}
-        />
-
-        <Button variant="secondary" size="sm" onClick={handleRun}>
-          Run
-        </Button>
-
-        {/* Auth / Mint */}
-        {needsWallet && (
-          <span className="text-xs text-muted">Connect wallet to mint</span>
-        )}
-        {needsAuth && (
-          <button
-            className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white"
-            onClick={signIn}
-            disabled={signingIn}
+        <div className="flex items-center gap-4">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-2"
+            onClick={handleRun}
           >
-            {signingIn ? "Signing..." : "Sign In"}
-          </button>
-        )}
-        {authError && <span className="text-xs text-danger">{authError}</span>}
+            <Play size={10} fill="currentColor" /> Execute
+          </Button>
 
-        <Button
-          size="sm"
-          onClick={handleMint}
-          disabled={!authenticated || mintLoading || !!renderError}
-        >
-          {mintLoading ? "Minting..." : "Mint NFT"}
-        </Button>
+          <div className="w-px h-6 bg-[var(--border)]" />
 
-        {mintSuccess && (
-          <span className="text-xs text-success font-medium">Mint prepared!</span>
-        )}
+          {needsWallet && (
+            <span className="font-mono text-[10px] text-[var(--text-dim)] uppercase tracking-widest">
+              Connect wallet
+            </span>
+          )}
+          {needsAuth && (
+            <Button size="sm" variant="outline" className="h-8" onClick={signIn} disabled={signingIn}>
+              {signingIn ? "Signing..." : "Authenticate"}
+            </Button>
+          )}
+          {authError && (
+            <span className="font-mono text-[10px] text-[var(--danger)]">
+              {authError}
+            </span>
+          )}
+
+          <Button
+            size="sm"
+            className="h-8"
+            onClick={handleMint}
+            disabled={!authenticated || mintLoading || !!renderError}
+          >
+            {mintLoading ? "Inscribing..." : "Inscribe Artifact"}
+          </Button>
+
+          {mintSuccess && (
+            <span className="font-mono text-[10px] text-[var(--success)] uppercase tracking-widest">
+              Inscribed.
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Error banner */}
       {(renderError || mintError) && (
-        <div className="px-4 py-3 bg-danger/10 border-b border-danger/30 flex items-start gap-3">
-          <span className="text-danger font-bold text-sm mt-0.5">Error</span>
-          <p className="text-sm text-danger font-mono flex-1">
+        <div className="px-6 py-3 bg-[var(--danger)]/10 border-b border-[var(--danger)]/30 flex items-center gap-3 z-10">
+          <span className="font-mono text-xs text-[var(--danger)] uppercase tracking-widest flex-1">
             {renderError || mintError}
-          </p>
+          </span>
           <button
-            onClick={() => { setRenderError(null); setMintError(null); }}
-            className="text-danger/60 hover:text-danger text-sm px-1"
+            onClick={() => {
+              setRenderError(null);
+              setMintError(null);
+            }}
+            className="text-[var(--danger)] hover:text-white"
           >
-            dismiss
+            <X size={14} />
           </button>
         </div>
       )}
 
-      {/* Split view: editor left, preview right */}
-      <div className="flex flex-1 overflow-hidden">
-        <div className="flex-1 min-w-0">
-          <CodeEditor
-            code={code}
-            onChange={setCode}
-            language={mode === "svg" ? "xml" : "javascript"}
-          />
+      {/* Split View */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Editor Side */}
+        <div className="w-1/2 border-r border-[var(--border)] bg-[#050505] flex flex-col">
+          <div className="flex justify-between items-center px-6 py-3 border-b border-[#222]">
+            <span className="font-mono text-[10px] text-[var(--accent)] uppercase tracking-widest flex items-center gap-2">
+              <TerminalSquare size={12} />{" "}
+              {mode === "javascript" ? "main.js" : "vector.svg"}
+            </span>
+          </div>
+          <div className="flex-1 min-h-0">
+            <CodeEditor
+              code={code}
+              onChange={setCode}
+              language={mode === "svg" ? "xml" : "javascript"}
+            />
+          </div>
         </div>
 
-        <div className="flex-1 min-w-0 border-l border-border">
-          <CodePreview
-            ref={previewRef}
-            code={liveCode}
-            mode={mode}
-            seed={seed}
-            palette={palette}
-            onError={setRenderError}
-          />
+        {/* Preview Side */}
+        <div
+          className="w-1/2 bg-[var(--bg)] relative flex items-center justify-center"
+          style={{
+            backgroundImage:
+              "url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wNSkiLz48L3N2Zz4=')",
+          }}
+        >
+          <div className="absolute top-6 right-6 font-mono text-[10px] text-[var(--accent)] uppercase tracking-widest flex items-center gap-2 z-10">
+            <div className="w-1.5 h-1.5 bg-[var(--accent)] animate-pulse" />{" "}
+            Output Buffer
+          </div>
+
+          <div className="w-full h-full">
+            <CodePreview
+              ref={previewRef}
+              code={liveCode}
+              mode={mode}
+              seed={seed}
+              palette={palette}
+              onError={setRenderError}
+            />
+          </div>
         </div>
       </div>
     </div>

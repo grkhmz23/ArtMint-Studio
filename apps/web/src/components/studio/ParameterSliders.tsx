@@ -18,15 +18,16 @@ export function ParameterSliders({ templateId, params, onChange }: Props) {
   };
 
   return (
-    <div className="space-y-3">
-      <label className="text-xs font-medium text-muted">Parameters</label>
+    <div className="space-y-6">
       {Object.entries(meta).map(([key, m]: [string, ParameterMetaEntry]) => (
-        <div key={key} className="space-y-1">
-          <div className="flex justify-between text-xs">
-            <span className="text-muted">{m.label}</span>
-            <span className="font-mono text-foreground">
+        <div key={key} className="space-y-3">
+          <div className="flex justify-between items-center font-mono text-xs uppercase tracking-widest text-[var(--text-dim)]">
+            <span>{m.label}</span>
+            <span className="text-white">
               {params[key] != null
-                ? (Number.isInteger(m.step) ? params[key] : params[key].toFixed(2))
+                ? Number.isInteger(m.step)
+                  ? params[key]
+                  : params[key].toFixed(2)
                 : m.min}
             </span>
           </div>
@@ -37,7 +38,6 @@ export function ParameterSliders({ templateId, params, onChange }: Props) {
             step={m.step}
             value={params[key] ?? m.min}
             onChange={(e) => updateParam(key, parseFloat(e.target.value))}
-            className="w-full h-1.5 rounded-full appearance-none bg-border accent-accent cursor-pointer"
           />
         </div>
       ))}

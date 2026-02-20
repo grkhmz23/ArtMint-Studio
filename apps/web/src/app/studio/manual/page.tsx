@@ -7,8 +7,10 @@ import { SeedInput } from "@/components/studio/SeedInput";
 import { PaletteEditor } from "@/components/studio/PaletteEditor";
 import { ParameterSliders } from "@/components/studio/ParameterSliders";
 import { MintButton } from "@/components/studio/MintButton";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/use-auth";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { Button } from "@/components/ui/button";
 import {
   defaultFlowFieldsParams,
   defaultJazzNoirParams,
@@ -37,16 +39,9 @@ export default function ManualStudioPage() {
     );
   };
 
-  // Build render URL for the ArtPreview img tag
   const previewSrc = useMemo(() => {
     const data = encodeURIComponent(
-      JSON.stringify({
-        templateId,
-        seed,
-        palette,
-        params,
-        format: "svg",
-      })
+      JSON.stringify({ templateId, seed, palette, params, format: "svg" })
     );
     return `/api/render?data=${data}`;
   }, [templateId, seed, palette, params]);
@@ -64,7 +59,6 @@ export default function ManualStudioPage() {
         title: title || undefined,
       }),
     });
-
     if (!res.ok) {
       const err = await res.json();
       throw new Error(err.error ?? "Mint failed");
@@ -77,61 +71,117 @@ export default function ManualStudioPage() {
   return (
     <div className="flex flex-col h-screen">
       <Header />
+      <div className="noise-overlay" />
+
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
-        <aside className="w-72 flex-shrink-0 overflow-y-auto border-r border-border bg-card p-4 space-y-5">
-          <h2 className="text-sm font-semibold text-foreground">Parameter Editor</h2>
-
-          {needsWallet && (
-            <div className="rounded-lg border border-accent/30 bg-accent/10 p-3 text-xs text-muted">
-              Connect your wallet to start creating.
-            </div>
-          )}
-
-          {needsAuth && (
-            <div className="rounded-lg border border-accent/30 bg-accent/10 p-3 text-xs space-y-2">
-              <span className="text-muted">Sign in to mint:</span>
-              <button
-                className="block w-full rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white"
-                onClick={signIn}
-                disabled={signingIn}
-              >
-                {signingIn ? "Signing..." : "Sign In With Solana"}
-              </button>
-              {authError && <p className="text-danger text-[11px]">{authError}</p>}
-            </div>
-          )}
-
-          <TemplateSelector value={templateId} onChange={handleTemplateChange} />
-          <SeedInput seed={seed} onChange={setSeed} />
-          <PaletteEditor palette={palette} onChange={setPalette} />
-          <ParameterSliders templateId={templateId} params={params} onChange={setParams} />
-
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-muted">Title (optional)</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder={`ArtMint #${seed}`}
-              className="w-full h-8 px-2 rounded-md border border-border bg-background text-foreground text-sm"
-              maxLength={200}
-            />
+        {/* Parameter Terminal (Left Sidebar) */}
+        <div className="w-[320px] shrink-0 border-r border-[var(--border)] bg-[var(--bg)] flex flex-col overflow-y-auto">
+          <div className="p-6 border-b border-[var(--border)]">
+            <h2 className="font-serif text-2xl text-white italic">
+              Parameters.
+            </h2>
+            <p className="font-mono text-[10px] text-[var(--text-dim)] uppercase tracking-widest mt-2">
+              Manual Control Deck
+            </p>
           </div>
 
-          <MintButton onMint={handleMint} disabled={!authenticated} />
-        </aside>
+          <div className="p-6 space-y-10">
+            {/* Auth banners */}
+            {needsWallet && (
+              <div className="border border-[var(--border)] p-4 font-mono text-[10px] text-[var(--text-dim)] uppercase tracking-widest">
+                Connect your wallet to initialize.
+              </div>
+            )}
+            {needsAuth && (
+              <div className="border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-4 space-y-3">
+                <span className="font-mono text-[10px] text-[var(--text-dim)] uppercase tracking-widest block">
+                  Authentication required:
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full"
+                  onClick={signIn}
+                  disabled={signingIn}
+                >
+                  {signingIn ? "Signing..." : "Sign In With Solana"}
+                </Button>
+                {authError && (
+                  <p className="font-mono text-[10px] text-[var(--danger)]">
+                    {authError}
+                  </p>
+                )}
+              </div>
+            )}
 
-        {/* Preview */}
-        <main className="flex-1 flex items-center justify-center bg-background overflow-auto p-6">
-          <div className="w-full max-w-[600px] aspect-square rounded-lg overflow-hidden border border-border bg-[#0a0a0f]">
+            {/* Template */}
+            <div className="space-y-4">
+              <label className="font-mono text-[10px] text-[var(--accent)] uppercase tracking-widest border-b border-[var(--border)] pb-2 block">
+                System Template
+              </label>
+              <TemplateSelector value={templateId} onChange={handleTemplateChange} />
+            </div>
+
+            {/* Seed */}
+            <div className="space-y-4">
+              <label className="font-mono text-[10px] text-[var(--accent)] uppercase tracking-widest border-b border-[var(--border)] pb-2 block">
+                Global Seed
+              </label>
+              <SeedInput seed={seed} onChange={setSeed} />
+            </div>
+
+            {/* Palette */}
+            <div className="space-y-4">
+              <label className="font-mono text-[10px] text-[var(--accent)] uppercase tracking-widest border-b border-[var(--border)] pb-2 block">
+                Color Matrix
+              </label>
+              <PaletteEditor palette={palette} onChange={setPalette} />
+            </div>
+
+            {/* Sliders */}
+            <div className="space-y-4">
+              <label className="font-mono text-[10px] text-[var(--accent)] uppercase tracking-widest border-b border-[var(--border)] pb-2 block">
+                Variables
+              </label>
+              <ParameterSliders
+                templateId={templateId}
+                params={params}
+                onChange={setParams}
+              />
+            </div>
+
+            {/* Title + Mint */}
+            <div className="pt-6 border-t border-[var(--border)] space-y-4">
+              <Input
+                placeholder={`Artwork Designation // ${seed}`}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                maxLength={200}
+              />
+              <MintButton onMint={handleMint} disabled={!authenticated} />
+            </div>
+          </div>
+        </div>
+
+        {/* Canvas Area */}
+        <div
+          className="flex-1 bg-[var(--bg)] relative flex items-center justify-center p-8"
+          style={{
+            backgroundImage:
+              "url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wNSkiLz48L3N2Zz4=')",
+          }}
+        >
+          <div className="w-full max-w-[700px] aspect-square bg-[#050505] border border-[var(--border)] relative overflow-hidden flex items-center justify-center">
+            <div className="absolute top-4 left-4 font-mono text-[10px] text-[var(--text-dim)] uppercase tracking-widest mix-blend-difference z-20">
+              Live Preview // [{templateId}]
+            </div>
             <img
               src={previewSrc}
               alt={`${templateId} preview`}
               className="w-full h-full object-cover"
             />
           </div>
-        </main>
+        </div>
       </div>
     </div>
   );
