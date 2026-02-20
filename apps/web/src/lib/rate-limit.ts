@@ -9,16 +9,17 @@ export interface RateLimitResult {
 /**
  * DB-backed sliding window rate limiter.
  * Uses atomic increment-then-check to prevent TOCTOU race conditions.
- * Fails CLOSED on DB error (blocks request rather than allowing unlimited).
  *
  * @param key - Unique identifier (e.g. "ai:ip:1.2.3.4" or "render:ip:1.2.3.4")
  * @param maxRequests - Maximum requests per window
  * @param windowMs - Window duration in milliseconds
+ * @param failMode - "closed" blocks on DB error (default), "open" allows on DB error
  */
 export async function checkRateLimit(
   key: string,
   maxRequests: number,
-  windowMs: number
+  windowMs: number,
+  failMode: "open" | "closed" = "closed"
 ): Promise<RateLimitResult> {
   const now = new Date();
   const windowStart = new Date(now.getTime() - windowMs);
@@ -63,8 +64,13 @@ export async function checkRateLimit(
       resetMs,
     };
   } catch (err) {
-    // FAIL CLOSED: if DB is down, block the request
-    console.error("Rate limit DB error (failing closed):", err instanceof Error ? err.message : err);
+    console.error(`Rate limit DB error (failing ${failMode}):`, err instanceof Error ? err.message : err);
+    if (failMode === "open") {
+      // Fail OPEN: allow request through when DB is unreachable.
+      // Safe when downstream operations also depend on the same DB.
+      return { allowed: true, remaining: maxRequests, resetMs: 0 };
+    }
+    // FAIL CLOSED: block the request if DB is down
     return { allowed: false, remaining: 0, resetMs: windowMs };
   }
 }

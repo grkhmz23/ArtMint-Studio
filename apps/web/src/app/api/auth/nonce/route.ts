@@ -12,9 +12,11 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(req: NextRequest) {
   try {
-    // Rate limit: 10 nonces/min per IP
+    // Rate limit: 30 nonces/min per IP.
+    // Fail OPEN: if DB is down, the authNonce.create below will also fail
+    // with a proper 500, so there's no risk of unbounded nonce creation.
     const clientIp = getClientIp(req);
-    const limit = await checkRateLimit(`nonce:ip:${clientIp}`, 30, 60_000);
+    const limit = await checkRateLimit(`nonce:ip:${clientIp}`, 30, 60_000, "open");
     if (!limit.allowed) {
       return NextResponse.json(
         { error: "Too many requests", code: "rate_limited" },
@@ -35,7 +37,13 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ nonce, message });
   } catch (err) {
-    console.error("Nonce error:", err instanceof Error ? err.message : err);
-    return NextResponse.json({ error: "Failed to generate nonce" }, { status: 500 });
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("Nonce error:", message);
+    // Surface DB connectivity issues clearly
+    const isDbError = message.includes("connect") || message.includes("ECONNREFUSED") || message.includes("prisma");
+    return NextResponse.json(
+      { error: isDbError ? "Database unavailable" : "Failed to generate nonce" },
+      { status: 503 }
+    );
   }
 }

@@ -69,6 +69,10 @@ export default function StudioPage() {
     try {
       // 1. Get nonce
       const nonceRes = await fetch("/api/auth/nonce");
+      if (!nonceRes.ok) {
+        const err = await nonceRes.json().catch(() => ({}));
+        throw new Error(err.error ?? `Nonce request failed (${nonceRes.status})`);
+      }
       const { nonce, message } = await nonceRes.json();
 
       // 2. Sign message with wallet
