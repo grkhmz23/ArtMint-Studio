@@ -15,7 +15,7 @@ export interface VariationResponse {
 }
 
 interface AIConfig {
-  provider: "openai" | "anthropic";
+  provider: "openai" | "anthropic" | "deepseek";
   apiKey: string;
   model: string;
 }
@@ -56,8 +56,11 @@ async function callAI(
     return textBlock.text;
   }
 
-  // OpenAI-compatible
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+  // OpenAI-compatible (OpenAI, DeepSeek, etc.)
+  const baseUrl = config.provider === "deepseek"
+    ? "https://api.deepseek.com"
+    : "https://api.openai.com";
+  const response = await fetch(`${baseUrl}/v1/chat/completions`, {
     method: "POST",
     headers: {
       "content-type": "application/json",

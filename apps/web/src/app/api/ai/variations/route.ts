@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const provider = (process.env.AI_PROVIDER ?? "anthropic") as "openai" | "anthropic";
+    const provider = (process.env.AI_PROVIDER?.toLowerCase() ?? "anthropic") as "openai" | "anthropic" | "deepseek";
     const apiKey = process.env.AI_API_KEY;
     const model = process.env.AI_MODEL ?? "claude-sonnet-4-20250514";
 
