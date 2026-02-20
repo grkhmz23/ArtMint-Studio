@@ -16,13 +16,39 @@ export default function Home() {
             Open Studio
           </button>
         </Link>
+        <Link href="/dashboard">
+          <button style={{ fontSize: 18, padding: "14px 32px" }}>
+            Dashboard
+          </button>
+        </Link>
       </div>
-      <div style={{ marginTop: 60, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 24, maxWidth: 800, margin: "60px auto 0" }}>
+      <div style={{ marginTop: 60, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 24, maxWidth: 1000, margin: "60px auto 0" }}>
         <div style={{ padding: 24, background: "var(--bg-card)", borderRadius: 12, border: "1px solid var(--border)" }}>
           <h3 style={{ marginBottom: 8 }}>Generate</h3>
           <p style={{ color: "var(--text-dim)", fontSize: 14 }}>
             AI creates parameterized variations from your prompt
           </p>
+          <Link href="/studio" style={{ color: "var(--accent)", fontSize: 13, marginTop: 12, display: "inline-block" }}>
+            Open AI Studio
+          </Link>
+        </div>
+        <div style={{ padding: 24, background: "var(--bg-card)", borderRadius: 12, border: "1px solid var(--border)" }}>
+          <h3 style={{ marginBottom: 8 }}>Manual</h3>
+          <p style={{ color: "var(--text-dim)", fontSize: 14 }}>
+            Tweak template parameters with sliders for direct control
+          </p>
+          <Link href="/studio/manual" style={{ color: "var(--accent)", fontSize: 13, marginTop: 12, display: "inline-block" }}>
+            Open Parameter Editor
+          </Link>
+        </div>
+        <div style={{ padding: 24, background: "var(--bg-card)", borderRadius: 12, border: "1px solid var(--border)" }}>
+          <h3 style={{ marginBottom: 8 }}>Code</h3>
+          <p style={{ color: "var(--text-dim)", fontSize: 14 }}>
+            Write custom JavaScript drawing code with live canvas preview
+          </p>
+          <Link href="/studio/code" style={{ color: "var(--accent)", fontSize: 13, marginTop: 12, display: "inline-block" }}>
+            Open Code Editor
+          </Link>
         </div>
         <div style={{ padding: 24, background: "var(--bg-card)", borderRadius: 12, border: "1px solid var(--border)" }}>
           <h3 style={{ marginBottom: 8 }}>Mint</h3>

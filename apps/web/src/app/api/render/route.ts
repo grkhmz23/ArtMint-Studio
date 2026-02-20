@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { generateSVG, renderPNGFromSVG } from "@artmint/render";
-import { templateIds, flowFieldsParamsSchema, jazzNoirParamsSchema } from "@artmint/common";
+import { renderableTemplateIds, flowFieldsParamsSchema, jazzNoirParamsSchema } from "@artmint/common";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Must be a hex color like #ff00aa");
 
 const renderSchema = z.object({
-  templateId: z.enum(templateIds),
+  templateId: z.enum(renderableTemplateIds),
   seed: z.number().int().min(0).max(999999999),
   palette: z.array(hexColor).min(2).max(8),
   params: z.record(z.unknown()),

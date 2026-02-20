@@ -31,8 +31,17 @@ export function Header() {
           ArtMint
         </Link>
         <nav style={{ display: "flex", gap: 16 }}>
+          <Link href="/dashboard" style={{ color: "var(--text-dim)", fontSize: 14 }}>
+            Dashboard
+          </Link>
           <Link href="/studio" style={{ color: "var(--text-dim)", fontSize: 14 }}>
             Studio
+          </Link>
+          <Link href="/studio/manual" style={{ color: "var(--text-dim)", fontSize: 14 }}>
+            Manual
+          </Link>
+          <Link href="/studio/code" style={{ color: "var(--text-dim)", fontSize: 14 }}>
+            Code
           </Link>
           {publicKey && (
             <Link

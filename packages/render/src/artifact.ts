@@ -1,5 +1,111 @@
 import type { CanonicalInput } from "@artmint/common";
 
+interface CustomCodeArtifactInput {
+  code: string;
+  seed: number;
+  palette: string[];
+}
+
+/**
+ * Build a self-contained HTML artifact for custom user code.
+ * Embeds user code + mulberry32 PRNG + noise2D helpers in a canvas-based page.
+ */
+export function buildCustomCodeArtifact(input: CustomCodeArtifactInput): string {
+  // XSS-safe: escape </ sequences to prevent </script> breakout
+  const safeCode = input.code.replace(/<\//g, "\\u003c/");
+  const paletteJson = JSON.stringify(input.palette).replace(/</g, "\\u003c");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>ArtMint – Custom Code #${input.seed}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0a;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:monospace;color:#ccc}
+canvas{max-width:100vmin;max-height:100vmin;border:1px solid #333}
+.controls{margin-top:16px;display:flex;gap:8px}
+button{background:#222;color:#fff;border:1px solid #555;padding:8px 16px;cursor:pointer;font-family:monospace;font-size:12px}
+button:hover{background:#333}
+</style>
+</head>
+<body>
+<canvas id="canvas" width="1080" height="1080"></canvas>
+<div class="controls">
+<button onclick="renderAt(1080)">1080px</button>
+<button onclick="renderAt(2160)">2160px</button>
+<button onclick="renderAt(3840)">4K</button>
+<button onclick="exportPNG()">Export PNG</button>
+</div>
+<script>
+// Mulberry32 PRNG
+function mulberry32(seed) {
+  let s = seed | 0;
+  return () => {
+    s = (s + 0x6d2b79f5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function createNoise2D(seed) {
+  const rng = mulberry32(seed);
+  const TABLE_SIZE = 256;
+  const table = [];
+  for (let i = 0; i < TABLE_SIZE; i++) table.push(rng());
+  function hash(x, y) { return table[((x * 374761393 + y * 668265263 + seed) & 0x7fffffff) % TABLE_SIZE]; }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function smoothstep(t) { return t * t * (3 - 2 * t); }
+  return (x, y) => {
+    const ix = Math.floor(x), iy = Math.floor(y);
+    const fx = smoothstep(x - ix), fy = smoothstep(y - iy);
+    return lerp(lerp(hash(ix,iy), hash(ix+1,iy), fx), lerp(hash(ix,iy+1), hash(ix+1,iy+1), fx), fy) * 2 - 1;
+  };
+}
+
+const seed = ${input.seed};
+const palette = ${paletteJson};
+const _rng = mulberry32(seed);
+function random() { return _rng(); }
+const noise2D = createNoise2D(seed + 1);
+
+let currentSize = 1080;
+
+function renderAt(size) {
+  currentSize = size;
+  const canvas = document.getElementById('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const WIDTH = size, HEIGHT = size;
+  // Reset PRNG for determinism
+  const _rng2 = mulberry32(seed);
+  const random2 = () => _rng2();
+  try {
+    (function(canvas, ctx, WIDTH, HEIGHT, seed, palette, random, noise2D) {
+${safeCode}
+    })(canvas, ctx, WIDTH, HEIGHT, seed, palette, random2, createNoise2D(seed + 1));
+  } catch(e) { console.error('Render error:', e); }
+}
+
+function exportPNG() {
+  const canvas = document.getElementById('canvas');
+  canvas.toBlob(b => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(b);
+    a.download = 'artmint-custom-' + seed + '-' + currentSize + 'px.png';
+    a.click();
+  }, 'image/png');
+}
+
+renderAt(1080);
+</script>
+</body>
+</html>`;
+}
+
 /**
  * Build a self-contained HTML artifact that embeds the renderer code
  * and input params inline. Works offline with no external dependencies.
