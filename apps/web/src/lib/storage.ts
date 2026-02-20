@@ -1,5 +1,6 @@
 import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { join, resolve, basename } from "path";
+import { put } from "@vercel/blob";
 
 const STORAGE_DIR = join(process.cwd(), "public", "uploads");
 
@@ -19,6 +20,20 @@ export async function uploadFile(
   contentType: string
 ): Promise<UploadResult> {
   const provider = process.env.STORAGE_PROVIDER ?? "local";
+
+  if (provider === "vercel-blob") {
+    const safeFilename = basename(filename).replace(/[^a-zA-Z0-9._-]/g, "_");
+    if (!safeFilename) {
+      throw new Error("Invalid filename");
+    }
+
+    const blob = await put(safeFilename, data, {
+      access: "public",
+      contentType,
+    });
+
+    return { url: blob.url };
+  }
 
   if (provider === "local") {
     ensureDir(STORAGE_DIR);
@@ -43,6 +58,6 @@ export async function uploadFile(
 
   throw new Error(
     `Storage provider "${provider}" is not implemented. ` +
-    `Set STORAGE_PROVIDER=local for development, or implement the "${provider}" upload handler.`
+    `Set STORAGE_PROVIDER=local for development, or STORAGE_PROVIDER=vercel-blob for production.`
   );
 }
