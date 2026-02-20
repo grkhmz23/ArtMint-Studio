@@ -89,7 +89,7 @@ canvas{display:none}
 <canvas id="canvas" width="1080" height="1080"></canvas>
 <script>
 try {
-  var svgStr = ${JSON.stringify(safeSvg)};
+  var svgStr = ${JSON.stringify(safeSvg).replace(/</g, "\\u003c")};
 
   // Basic SVG validation
   if (!svgStr.trim()) {

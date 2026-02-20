@@ -11,10 +11,10 @@ interface CustomCodeArtifactInput {
  * Embeds user SVG directly with resolution controls + PNG export.
  */
 export function buildCustomSvgArtifact(input: { code: string }): string {
-  // Strip script tags from SVG for safety, escape for embedding
-  const safeSvg = input.code
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/</g, "\\u003c");
+  // Strip script tags from SVG for safety
+  const stripped = input.code.replace(/<script[\s\S]*?<\/script>/gi, "");
+  // JSON.stringify handles quotes/newlines/backslashes, then escape </ for HTML safety
+  const svgJsonStr = JSON.stringify(stripped).replace(/</g, "\\u003c");
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -42,7 +42,7 @@ button:hover{background:#333}
 <button onclick="exportPNG(3840)">4K</button>
 </div>
 <script>
-var svgStr = "${safeSvg}";
+var svgStr = ${svgJsonStr};
 document.getElementById('preview').innerHTML = svgStr;
 
 function exportPNG(size) {
