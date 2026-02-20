@@ -117,7 +117,6 @@ export function buildSignMessage(nonce: string): string {
     ``,
     `Domain: ${domain}`,
     `Nonce: ${nonce}`,
-    `Issued At: ${new Date().toISOString()}`,
   ].join("\n");
 }
 

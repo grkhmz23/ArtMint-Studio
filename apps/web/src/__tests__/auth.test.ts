@@ -51,7 +51,9 @@ describe("auth: SIWS message", () => {
     expect(msg).toContain("ArtMint Studio");
     expect(msg).toContain("Nonce: abc123");
     expect(msg).toContain("Domain:");
-    expect(msg).toContain("Issued At:");
+    // Message is deterministic (no timestamp) so nonce/verify produce identical bytes
+    const msg2 = buildSignMessage(nonce);
+    expect(msg).toBe(msg2);
   });
 });
 
