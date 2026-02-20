@@ -14,6 +14,16 @@ export interface UploadResult {
   url: string;
 }
 
+/**
+ * Determine whether the Vercel Blob store uses public or private access.
+ * Set BLOB_ACCESS=private in env if your store is private.
+ */
+function getBlobAccess(): "public" | "private" {
+  const val = process.env.BLOB_ACCESS?.toLowerCase();
+  if (val === "private") return "private";
+  return "public";
+}
+
 export async function uploadFile(
   data: Buffer | string,
   filename: string,
@@ -27,10 +37,19 @@ export async function uploadFile(
       throw new Error("Invalid filename");
     }
 
+    const access = getBlobAccess();
+
     const blob = await put(safeFilename, data, {
-      access: "public",
+      access,
       contentType,
     });
+
+    // For private stores, rewrite URLs to go through our proxy endpoint
+    // so browser <img> tags and fetch calls can access them.
+    if (access === "private") {
+      const proxyUrl = `/api/blob?url=${encodeURIComponent(blob.url)}`;
+      return { url: proxyUrl };
+    }
 
     return { url: blob.url };
   }
