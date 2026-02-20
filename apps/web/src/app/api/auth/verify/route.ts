@@ -35,28 +35,16 @@ export async function POST(req: NextRequest) {
 
     const { wallet, nonce, signature } = parsed.data;
 
-    // 1. Find and validate the nonce
-    const authNonce = await prisma.authNonce.findUnique({
-      where: { nonce },
+    // 1. Atomically claim the nonce (prevents replay race condition).
+    // updateMany with WHERE used=false ensures only one concurrent request succeeds.
+    const claimed = await prisma.authNonce.updateMany({
+      where: { nonce, used: false, expiresAt: { gt: new Date() } },
+      data: { used: true, wallet },
     });
 
-    if (!authNonce) {
+    if (claimed.count === 0) {
       return NextResponse.json(
-        { error: "Invalid or expired nonce" },
-        { status: 401 }
-      );
-    }
-
-    if (authNonce.used) {
-      return NextResponse.json(
-        { error: "Nonce already used" },
-        { status: 401 }
-      );
-    }
-
-    if (authNonce.expiresAt < new Date()) {
-      return NextResponse.json(
-        { error: "Nonce expired" },
+        { error: "Invalid, expired, or already used nonce" },
         { status: 401 }
       );
     }
@@ -91,17 +79,16 @@ export async function POST(req: NextRequest) {
     );
 
     if (!verified) {
+      // Signature failed — un-claim the nonce so it can be retried
+      await prisma.authNonce.updateMany({
+        where: { nonce },
+        data: { used: false, wallet: null },
+      });
       return NextResponse.json(
         { error: "Signature verification failed" },
         { status: 401 }
       );
     }
-
-    // 3. Mark nonce as used
-    await prisma.authNonce.update({
-      where: { nonce },
-      data: { used: true, wallet },
-    });
 
     // 4. Create session
     const token = createSessionToken(wallet);
@@ -120,8 +107,7 @@ export async function POST(req: NextRequest) {
     setSessionCookie(res, token);
     return res;
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Verify error";
-    console.error("Auth verify error:", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("Auth verify error:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Verification failed" }, { status: 500 });
   }
 }

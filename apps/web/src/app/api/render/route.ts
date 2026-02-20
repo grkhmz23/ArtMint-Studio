@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { generateSVG, renderPNGFromSVG } from "@artmint/render";
-import { templateIds } from "@artmint/common";
+import { templateIds, flowFieldsParamsSchema, jazzNoirParamsSchema } from "@artmint/common";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +15,15 @@ const renderSchema = z.object({
   params: z.record(z.unknown()),
   format: z.enum(["svg", "png"]).optional(),
   size: z.number().int().min(100).max(2160).optional(),
+}).superRefine((data, ctx) => {
+  // Validate params against the specific template schema
+  const schema = data.templateId === "flow_fields" ? flowFieldsParamsSchema : jazzNoirParamsSchema;
+  const result = schema.safeParse(data.params);
+  if (!result.success) {
+    for (const issue of result.error.issues) {
+      ctx.addIssue({ ...issue, path: ["params", ...issue.path] });
+    }
+  }
 });
 
 /** Security headers for SVG responses — prevent script execution */
@@ -67,7 +76,7 @@ export async function GET(req: NextRequest) {
 
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "Invalid request", details: parsed.error.issues },
+        { error: "Invalid render parameters" },
         { status: 400 }
       );
     }
@@ -82,8 +91,8 @@ export async function GET(req: NextRequest) {
 
     return new NextResponse(svg, { headers: SVG_HEADERS });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Render error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("Render GET error:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Render failed" }, { status: 500 });
   }
 }
 
@@ -92,12 +101,18 @@ export async function POST(req: NextRequest) {
     const rateLimitResponse = await applyRateLimit(req);
     if (rateLimitResponse) return rateLimitResponse;
 
+    // Body size check — reject before parsing if Content-Length exceeds 4KB
+    const contentLength = req.headers.get("content-length");
+    if (contentLength && parseInt(contentLength, 10) > 4096) {
+      return NextResponse.json({ error: "Request body too large" }, { status: 413 });
+    }
+
     const body = await req.json();
     const parsed = renderSchema.safeParse(body);
 
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "Invalid request", details: parsed.error.issues },
+        { error: "Invalid render parameters" },
         { status: 400 }
       );
     }
@@ -112,7 +127,7 @@ export async function POST(req: NextRequest) {
 
     return new NextResponse(svg, { headers: SVG_HEADERS });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Render error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("Render POST error:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Render failed" }, { status: 500 });
   }
 }

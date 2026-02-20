@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -19,17 +19,21 @@ model Draft {
 }
 
 model Mint {
-  id           String   @id @default(cuid())
-  mintAddress  String   @unique
-  inputJson    String   // Canonical input JSON
-  hash         String
-  imageUrl     String
-  animationUrl String
-  metadataUrl  String
-  title        String?
-  wallet       String
-  createdAt    DateTime @default(now())
-  listing      Listing?
+  id            String   @id @default(cuid())
+  mintAddress   String   @unique
+  inputJson     String   // Canonical input JSON
+  hash          String
+  imageUrl      String
+  animationUrl  String
+  metadataUrl   String
+  title         String?
+  wallet        String
+  txSignature   String?  @unique // On-chain tx sig — unique to prevent replay
+  status        String   @default("pending") // pending, confirmed
+  createdAt     DateTime @default(now())
+  listing       Listing?
+
+  @@index([wallet])
 }
 
 model Listing {
@@ -42,6 +46,8 @@ model Listing {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   mint          Mint     @relation(fields: [mintAddress], references: [mintAddress])
+
+  @@index([status])
 }
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
@@ -53,6 +59,8 @@ model AuthNonce {
   expiresAt DateTime
   used      Boolean  @default(false)
   createdAt DateTime @default(now())
+
+  @@index([expiresAt])
 }
 
 model Session {
@@ -61,6 +69,9 @@ model Session {
   wallet    String
   expiresAt DateTime
   createdAt DateTime @default(now())
+
+  @@index([wallet])
+  @@index([expiresAt])
 }
 
 // ── Usage quotas & rate limiting ─────────────────────────────────────────────

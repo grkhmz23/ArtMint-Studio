@@ -205,6 +205,7 @@ export function AssetClient({ mint }: { mint: MintData }) {
             {showLive ? (
               <iframe
                 src={mint.animationUrl}
+                sandbox="allow-scripts"
                 style={{ width: "100%", height: "100%", border: "none" }}
                 title="Live render"
               />

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 import { verifyTransaction } from "@/lib/solana-verify";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -19,17 +20,38 @@ export async function POST(req: NextRequest) {
     if (authResult instanceof NextResponse) return authResult;
     const wallet = authResult;
 
+    // Rate limit: 10 req/min per IP
+    const clientIp = getClientIp(req);
+    const ipLimit = await checkRateLimit(`confirm:ip:${clientIp}`, 10, 60_000);
+    if (!ipLimit.allowed) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded", code: "rate_limited" },
+        { status: 429, headers: { "Retry-After": String(Math.ceil(ipLimit.resetMs / 1000)) } }
+      );
+    }
+
     const body = await req.json();
     const parsed = confirmSchema.safeParse(body);
 
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "Invalid request", details: parsed.error.issues },
+        { error: "Invalid request" },
         { status: 400 }
       );
     }
 
     const { placeholderMintAddress, mintAddress, txSignature } = parsed.data;
+
+    // Check for TX signature replay — reject if already used
+    const existingTx = await prisma.mint.findFirst({
+      where: { txSignature },
+    });
+    if (existingTx) {
+      return NextResponse.json(
+        { error: "Transaction signature already used for another mint" },
+        { status: 409 }
+      );
+    }
 
     // Verify the pending mint exists and belongs to the session wallet
     const existingMint = await prisma.mint.findUnique({
@@ -50,7 +72,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!existingMint.mintAddress.startsWith("pending-")) {
+    if (existingMint.status === "confirmed") {
       return NextResponse.json(
         { error: "Mint already confirmed" },
         { status: 409 }
@@ -61,19 +83,24 @@ export async function POST(req: NextRequest) {
     const txResult = await verifyTransaction(txSignature, wallet, mintAddress);
     if (!txResult.valid) {
       return NextResponse.json(
-        { error: `Transaction verification failed: ${txResult.error}` },
+        { error: "Transaction verification failed" },
         { status: 400 }
       );
     }
 
+    // Atomically update — set real mint address, tx signature, and status
     await prisma.mint.update({
       where: { mintAddress: placeholderMintAddress },
-      data: { mintAddress },
+      data: {
+        mintAddress,
+        txSignature,
+        status: "confirmed",
+      },
     });
 
     return NextResponse.json({ success: true, mintAddress });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Confirm error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("Mint confirm error:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Confirmation failed" }, { status: 500 });
   }
 }

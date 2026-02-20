@@ -108,8 +108,7 @@ export async function POST(req: NextRequest) {
       quota: quotaResult.quotaInfo,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    console.error("AI variation error:", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("AI variation error:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Generation failed" }, { status: 500 });
   }
 }

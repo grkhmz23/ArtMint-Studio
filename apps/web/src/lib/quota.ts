@@ -23,6 +23,7 @@ export interface QuotaInfo {
 
 /**
  * Check and increment usage quota for a given wallet + action.
+ * Uses atomic increment-then-check in a transaction to prevent TOCTOU races.
  * Returns null if OK (and increments the counter), or an error response.
  */
 export async function checkAndIncrementQuota(
@@ -32,33 +33,53 @@ export async function checkAndIncrementQuota(
   const date = todayString();
   const resetAt = tomorrowResetAt();
 
-  // Check global cap first
-  const globalResult = await prisma.usageCounter.aggregate({
-    _sum: { count: true },
-    where: { date, action },
+  // Use a transaction for atomicity
+  const result = await prisma.$transaction(async (tx) => {
+    // Check global cap first
+    const globalResult = await tx.usageCounter.aggregate({
+      _sum: { count: true },
+      where: { date, action },
+    });
+    const globalUsed = globalResult._sum.count ?? 0;
+
+    if (globalUsed >= AI_MAX_DAILY_GLOBAL) {
+      return { blocked: "global" as const };
+    }
+
+    // Atomically increment per-user counter and check the result
+    const record = await tx.usageCounter.upsert({
+      where: { date_userWallet_action: { date, userWallet: wallet, action } },
+      update: { count: { increment: 1 } },
+      create: { date, userWallet: wallet, action, count: 1 },
+    });
+
+    // Check AFTER increment — if count exceeds limit, the request that
+    // pushed it over is denied (not the next one)
+    if (record.count > AI_MAX_DAILY_PER_USER) {
+      // Roll back the increment by decrementing
+      await tx.usageCounter.update({
+        where: { date_userWallet_action: { date, userWallet: wallet, action } },
+        data: { count: { decrement: 1 } },
+      });
+      return { blocked: "user" as const };
+    }
+
+    return { count: record.count };
   });
-  const globalUsed = globalResult._sum.count ?? 0;
 
-  if (globalUsed >= AI_MAX_DAILY_GLOBAL) {
-    return {
-      error: NextResponse.json(
-        {
-          error: "AI generation paused — daily global limit reached. Try again tomorrow.",
-          code: "ai_paused",
-          resetAt,
-        },
-        { status: 503 }
-      ),
-    };
-  }
-
-  // Check per-user quota
-  const existing = await prisma.usageCounter.findUnique({
-    where: { date_userWallet_action: { date, userWallet: wallet, action } },
-  });
-  const userUsed = existing?.count ?? 0;
-
-  if (userUsed >= AI_MAX_DAILY_PER_USER) {
+  if ("blocked" in result) {
+    if (result.blocked === "global") {
+      return {
+        error: NextResponse.json(
+          {
+            error: "AI generation paused — daily global limit reached. Try again tomorrow.",
+            code: "ai_paused",
+            resetAt,
+          },
+          { status: 503 }
+        ),
+      };
+    }
     return {
       error: NextResponse.json(
         {
@@ -73,16 +94,9 @@ export async function checkAndIncrementQuota(
     };
   }
 
-  // Increment counter
-  await prisma.usageCounter.upsert({
-    where: { date_userWallet_action: { date, userWallet: wallet, action } },
-    update: { count: { increment: 1 } },
-    create: { date, userWallet: wallet, action, count: 1 },
-  });
-
   return {
     quotaInfo: {
-      remaining: AI_MAX_DAILY_PER_USER - userUsed - 1,
+      remaining: AI_MAX_DAILY_PER_USER - result.count,
       limit: AI_MAX_DAILY_PER_USER,
       resetAt,
     },

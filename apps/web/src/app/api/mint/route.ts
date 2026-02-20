@@ -139,8 +139,7 @@ export async function POST(req: NextRequest) {
       canonicalInput,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Mint error";
-    console.error("Mint preparation error:", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("Mint preparation error:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Mint preparation failed" }, { status: 500 });
   }
 }

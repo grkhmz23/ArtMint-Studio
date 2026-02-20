@@ -8,7 +8,8 @@
     "test": "pnpm -r test",
     "db:migrate": "pnpm --filter @artmint/web prisma:migrate",
     "db:studio": "pnpm --filter @artmint/web prisma:studio",
-    "lint": "pnpm -r lint"
+    "lint": "pnpm -r lint",
+    "postinstall": "prisma generate --schema=prisma/schema.prisma"
   },
   "engines": {
     "node": ">=18",

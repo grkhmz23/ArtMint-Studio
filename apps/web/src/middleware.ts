@@ -19,12 +19,17 @@ export function middleware(req: NextRequest) {
     }
   }
 
-  // Security headers (all pages)
+  // Security headers (all routes including uploads)
   res.headers.set("X-Content-Type-Options", "nosniff");
   res.headers.set("X-Frame-Options", "DENY");
   res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   res.headers.set("X-DNS-Prefetch-Control", "off");
   res.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+
+  // HSTS — enforce HTTPS in production
+  if (process.env.NODE_ENV === "production") {
+    res.headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
+  }
 
   // CSP for pages — allow inline styles (needed for React inline styles),
   // wallet adapter scripts, and self for everything else.
@@ -48,6 +53,6 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // Run on all routes except static files
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|uploads/).*)"],
+  // Run on all routes — including uploads (for security headers)
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };

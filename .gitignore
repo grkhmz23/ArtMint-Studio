@@ -3,8 +3,10 @@ node_modules/
 dist/
 *.tsbuildinfo
 .env
-.env.local
+.env.*
+!.env.example
 *.db
 *.db-journal
 coverage/
 .turbo/
+public/uploads/

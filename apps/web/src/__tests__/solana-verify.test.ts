@@ -153,7 +153,7 @@ describe("solana-verify: verifyTransaction", () => {
     expect(result.valid).toBe(true);
   });
 
-  it("fails closed on RPC error in mainnet", async () => {
+  it("fails closed on RPC error", async () => {
     mockGetTransaction.mockRejectedValue(new Error("RPC unavailable"));
 
     const result = await verifyTransaction(txSig, wallet);
@@ -161,12 +161,32 @@ describe("solana-verify: verifyTransaction", () => {
     expect(result.error).toContain("Verification failed");
   });
 
-  it("fails open on RPC error in devnet", async () => {
+  it("fails closed on RPC error even on devnet", async () => {
     process.env.SOLANA_CLUSTER = "devnet";
     mockGetTransaction.mockRejectedValue(new Error("RPC unavailable"));
 
     const result = await verifyTransaction(txSig, wallet);
-    // devnet fail-open behavior
-    expect(result.valid).toBe(true);
+    // Now always fails closed — no devnet exception
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain("Verification failed");
+  });
+
+  it("rejects when blockTime is null", async () => {
+    mockGetTransaction.mockResolvedValue({
+      meta: { err: null },
+      blockTime: null,
+      transaction: {
+        message: {
+          getAccountKeys: () => ({
+            get: (i: number) => (i === 0 ? { toBase58: () => wallet } : null),
+            length: 1,
+          }),
+        },
+      },
+    });
+
+    const result = await verifyTransaction(txSig, wallet);
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain("Block time unavailable");
   });
 });

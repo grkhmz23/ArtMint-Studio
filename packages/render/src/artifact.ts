@@ -5,15 +5,19 @@ import type { CanonicalInput } from "@artmint/common";
  * and input params inline. Works offline with no external dependencies.
  */
 export function buildHtmlArtifact(input: CanonicalInput): string {
-  // We inline the renderer logic as a self-contained script
-  const inputJson = JSON.stringify(input);
+  // We inline the renderer logic as a self-contained script.
+  // CRITICAL: escape </ sequences to prevent </script> breakout (XSS).
+  const inputJson = JSON.stringify(input).replace(/</g, "\\u003c");
+
+  // Sanitize title to prevent injection
+  const safeTemplateId = input.templateId.replace(/[<>"&]/g, "");
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>ArtMint – ${input.templateId} #${input.seed}</title>
+<title>ArtMint – ${safeTemplateId} #${input.seed}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a0a;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:monospace;color:#ccc}

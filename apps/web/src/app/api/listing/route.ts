@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,7 @@ const listingSchema = z.object({
   priceLamports: z.string().regex(/^\d+$/, "Must be a positive integer string"),
   txSignature: z.string().optional(),
   saleStateKey: z.string().optional(),
-  status: z.enum(["pending", "active", "sold", "cancelled"]).optional(),
+  // Status is server-determined — NOT accepted from client
 });
 
 export async function POST(req: NextRequest) {
@@ -20,12 +21,22 @@ export async function POST(req: NextRequest) {
     if (authResult instanceof NextResponse) return authResult;
     const wallet = authResult;
 
+    // Rate limit: 10 req/min per IP
+    const clientIp = getClientIp(req);
+    const ipLimit = await checkRateLimit(`listing:ip:${clientIp}`, 10, 60_000);
+    if (!ipLimit.allowed) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded", code: "rate_limited" },
+        { status: 429, headers: { "Retry-After": String(Math.ceil(ipLimit.resetMs / 1000)) } }
+      );
+    }
+
     const body = await req.json();
     const parsed = listingSchema.safeParse(body);
 
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "Invalid request", details: parsed.error.issues },
+        { error: "Invalid request" },
         { status: 400 }
       );
     }
@@ -60,20 +71,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Status is server-determined: new listings are "pending", existing stay as-is on price update
     const listing = await prisma.listing.upsert({
       where: { mintAddress: parsed.data.mintAddress },
       update: {
         priceLamports: priceBigInt,
         txSignature: parsed.data.txSignature,
         saleStateKey: parsed.data.saleStateKey,
-        status: parsed.data.status ?? "active",
       },
       create: {
         mintAddress: parsed.data.mintAddress,
         priceLamports: priceBigInt,
         txSignature: parsed.data.txSignature,
         saleStateKey: parsed.data.saleStateKey,
-        status: parsed.data.status ?? "pending",
+        status: "pending",
       },
     });
 
@@ -85,7 +96,7 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Listing error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("Listing error:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Listing failed" }, { status: 500 });
   }
 }
