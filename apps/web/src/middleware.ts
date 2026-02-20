@@ -39,11 +39,12 @@ export function middleware(req: NextRequest) {
       "Content-Security-Policy",
       [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-        "font-src 'self' https://fonts.gstatic.com",
+        "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
+        "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net",
         "img-src 'self' data: blob: http://localhost:* https:",
-        "connect-src 'self' https://api.devnet.solana.com https://api.mainnet-beta.solana.com https://*.helius-rpc.com wss:",
+        "connect-src 'self' https://api.devnet.solana.com https://api.mainnet-beta.solana.com https://*.helius-rpc.com https://cdn.jsdelivr.net wss:",
+        "worker-src 'self' blob:",
         "frame-src 'self' blob:",
         "frame-ancestors 'none'",
       ].join("; ")
