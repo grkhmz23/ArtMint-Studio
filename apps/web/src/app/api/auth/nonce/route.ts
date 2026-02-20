@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { generateNonce, buildSignMessage } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 /**
  * GET /api/auth/nonce
  * Returns a nonce and the message to sign. Nonce expires in 5 minutes.
