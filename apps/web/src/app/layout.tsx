@@ -5,6 +5,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "ArtMint Studio – AI Art Director",
   description: "Generate, mint, and sell deterministic generative art on Solana",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({

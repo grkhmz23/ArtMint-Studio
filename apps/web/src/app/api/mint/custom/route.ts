@@ -22,13 +22,19 @@ const customMintSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  // Auth
+  let wallet: string;
   try {
-    // Auth
     const authResult = await requireAuth(req);
     if (authResult instanceof NextResponse) return authResult;
-    const wallet = authResult;
+    wallet = authResult;
+  } catch (err) {
+    console.error("Custom mint auth error:", err);
+    return NextResponse.json({ error: "Authentication failed" }, { status: 401 });
+  }
 
-    // Rate limit
+  // Rate limit
+  try {
     const clientIp = getClientIp(req);
     const rateLimit = await checkRateLimit(`mint:${clientIp}`, 10, 60_000);
     if (!rateLimit.allowed) {
@@ -37,28 +43,44 @@ export async function POST(req: NextRequest) {
         { status: 429, headers: { "Retry-After": String(Math.ceil(rateLimit.resetMs / 1000)) } }
       );
     }
+  } catch (err) {
+    console.error("Custom mint rate limit error:", err);
+    // Continue — fail open on rate limit errors
+  }
 
-    // Body size guard — reject before full parse if Content-Length is excessive
-    const contentLength = req.headers.get("content-length");
-    if (contentLength && parseInt(contentLength, 10) > 12_000_000) {
-      return NextResponse.json({ error: "Request body too large" }, { status: 413 });
-    }
+  // Body size guard
+  const contentLength = req.headers.get("content-length");
+  if (contentLength && parseInt(contentLength, 10) > 12_000_000) {
+    return NextResponse.json({ error: "Request body too large (max 12MB)" }, { status: 413 });
+  }
 
+  // Parse body
+  let parsed;
+  try {
     const body = await req.json();
-    const parsed = customMintSchema.safeParse(body);
+    parsed = customMintSchema.safeParse(body);
+  } catch (err) {
+    console.error("Custom mint body parse error:", err);
+    return NextResponse.json({ error: "Failed to parse request body" }, { status: 400 });
+  }
 
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: "Invalid request", details: parsed.error.issues },
-        { status: 400 }
-      );
-    }
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid request", details: parsed.error.issues },
+      { status: 400 }
+    );
+  }
 
-    const { code, mode, seed, palette, title, description, pngBase64 } = parsed.data;
+  const { code, mode, seed, palette, title, description, pngBase64 } = parsed.data;
 
-    // Decode base64 PNG from client canvas capture
-    const pngData = pngBase64.replace(/^data:image\/png;base64,/, "");
+  try {
+    // Decode base64 image from client canvas capture (supports png and jpeg data URLs)
+    const pngData = pngBase64.replace(/^data:image\/[a-z]+;base64,/, "");
     const pngBuffer = Buffer.from(pngData, "base64");
+
+    if (pngBuffer.length < 100) {
+      return NextResponse.json({ error: "Image capture appears empty — try again" }, { status: 400 });
+    }
 
     // Build canonical input
     const createdAt = new Date().toISOString();
@@ -73,20 +95,33 @@ export async function POST(req: NextRequest) {
     const hash = computeHash(deterministicInput);
     const canonicalInput = { ...deterministicInput, createdAt };
 
-    // Build HTML artifact — use the right builder based on code mode
-    const htmlArtifact = mode === "svg"
-      ? buildCustomSvgArtifact({ code })
-      : buildCustomCodeArtifact({ code, seed, palette });
+    // Build HTML artifact
+    let htmlArtifact: string;
+    try {
+      htmlArtifact = mode === "svg"
+        ? buildCustomSvgArtifact({ code })
+        : buildCustomCodeArtifact({ code, seed, palette });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("Artifact build error:", msg);
+      return NextResponse.json({ error: `Failed to build artifact: ${msg}` }, { status: 500 });
+    }
 
     // Upload assets
     const fileId = `custom-${seed}-${hash.slice(0, 8)}`;
+    let imageResult, animationResult;
+    try {
+      [imageResult, animationResult] = await Promise.all([
+        uploadFile(pngBuffer, `${fileId}.png`, "image/png"),
+        uploadFile(Buffer.from(htmlArtifact, "utf-8"), `${fileId}.html`, "text/html"),
+      ]);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("Storage upload error:", msg);
+      return NextResponse.json({ error: `Storage upload failed: ${msg}` }, { status: 500 });
+    }
 
-    const [imageResult, animationResult] = await Promise.all([
-      uploadFile(pngBuffer, `${fileId}.png`, "image/png"),
-      uploadFile(htmlArtifact, `${fileId}.html`, "text/html"),
-    ]);
-
-    // Build metadata JSON
+    // Build & upload metadata JSON
     const metadata = {
       name: title ?? `ArtMint Custom #${seed}`,
       symbol: "ARTMINT",
@@ -110,24 +145,40 @@ export async function POST(req: NextRequest) {
       },
     };
 
-    const metadataJson = JSON.stringify(metadata, null, 2);
-    const metadataResult = await uploadFile(metadataJson, `${fileId}-metadata.json`, "application/json");
+    let metadataResult;
+    try {
+      const metadataJson = JSON.stringify(metadata, null, 2);
+      metadataResult = await uploadFile(
+        Buffer.from(metadataJson, "utf-8"),
+        `${fileId}-metadata.json`,
+        "application/json"
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("Metadata upload error:", msg);
+      return NextResponse.json({ error: `Metadata upload failed: ${msg}` }, { status: 500 });
+    }
 
     // Save to database
     const placeholderMintAddress = `pending-${hash.slice(0, 16)}`;
-
-    await prisma.mint.create({
-      data: {
-        mintAddress: placeholderMintAddress,
-        inputJson: stableStringify(canonicalInput),
-        hash,
-        imageUrl: imageResult.url,
-        animationUrl: animationResult.url,
-        metadataUrl: metadataResult.url,
-        title: title ?? `ArtMint Custom #${seed}`,
-        wallet,
-      },
-    });
+    try {
+      await prisma.mint.create({
+        data: {
+          mintAddress: placeholderMintAddress,
+          inputJson: stableStringify(canonicalInput),
+          hash,
+          imageUrl: imageResult.url,
+          animationUrl: animationResult.url,
+          metadataUrl: metadataResult.url,
+          title: title ?? `ArtMint Custom #${seed}`,
+          wallet,
+        },
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("Database save error:", msg);
+      return NextResponse.json({ error: `Database save failed: ${msg}` }, { status: 500 });
+    }
 
     return NextResponse.json({
       success: true,
@@ -139,7 +190,11 @@ export async function POST(req: NextRequest) {
       canonicalInput,
     });
   } catch (err) {
-    console.error("Custom mint error:", err instanceof Error ? err.message : err);
-    return NextResponse.json({ error: "Mint preparation failed" }, { status: 500 });
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("Custom mint unexpected error:", message, err instanceof Error ? err.stack : "");
+    return NextResponse.json(
+      { error: `Mint failed: ${message}` },
+      { status: 500 }
+    );
   }
 }

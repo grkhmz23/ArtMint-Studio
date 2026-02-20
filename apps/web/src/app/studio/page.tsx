@@ -297,9 +297,13 @@ export default function StudioPage() {
             <DetailPanel
               variation={selected}
               prompt={prompt}
+              preset={selectedPreset}
+              allVariations={variations}
+              selectedIndex={selectedIndex ?? undefined}
               onMoreLikeThis={() => handleMoreLikeThis(selected)}
               onClose={() => setSelectedIndex(null)}
               wallet={publicKey?.toBase58() ?? null}
+              authenticated={authenticated}
             />
           )}
         </AnimatePresence>

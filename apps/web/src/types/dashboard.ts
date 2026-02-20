@@ -27,11 +27,20 @@ export interface ActivityItem {
   timestamp: string;
 }
 
+export interface DraftItem {
+  id: string;
+  type: "ai" | "code" | "manual";
+  title: string | null;
+  imageUrl: string | null;
+  updatedAt: string;
+}
+
 export interface DashboardData {
   authenticated: boolean;
   wallet?: string;
   stats?: DashboardStats;
   recentMints?: DashboardMint[];
   recentActivity?: ActivityItem[];
+  drafts?: DraftItem[];
   quota?: { remaining: number; limit: number };
 }

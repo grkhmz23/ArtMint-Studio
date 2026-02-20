@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
     activeListings,
     listingValueAgg,
     recentMints,
+    recentDrafts,
     quota,
   ] = await Promise.all([
     prisma.mint.count({ where: { wallet } }),
@@ -37,6 +38,11 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: "desc" },
       take: 8,
       include: { listing: { select: { priceLamports: true, status: true } } },
+    }),
+    prisma.draft.findMany({
+      where: { wallet },
+      orderBy: { updatedAt: "desc" },
+      take: 6,
     }),
     getQuotaInfo(wallet, "ai_variation"),
   ]);
@@ -77,6 +83,13 @@ export async function GET(req: NextRequest) {
         : null,
     })),
     recentActivity,
+    drafts: recentDrafts.map((d) => ({
+      id: d.id,
+      type: d.type,
+      title: d.title,
+      imageUrl: d.imageUrl,
+      updatedAt: d.updatedAt.toISOString(),
+    })),
     quota: { remaining: quota.remaining, limit: quota.limit },
   });
 }

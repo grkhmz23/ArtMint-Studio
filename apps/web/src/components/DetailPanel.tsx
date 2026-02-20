@@ -6,26 +6,36 @@ import type { Variation } from "@artmint/common";
 import { ArtPreview } from "./ArtPreview";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import { X } from "lucide-react";
+import { X, Save } from "lucide-react";
 
 interface Props {
   variation: Variation;
   prompt: string;
+  preset?: string;
+  allVariations?: Variation[];
+  selectedIndex?: number;
   onMoreLikeThis: () => void;
   onClose: () => void;
   wallet: string | null;
+  authenticated?: boolean;
 }
 
 export function DetailPanel({
   variation,
   prompt,
+  preset,
+  allVariations,
+  selectedIndex,
   onMoreLikeThis,
   onClose,
   wallet,
+  authenticated,
 }: Props) {
   const router = useRouter();
   const [minting, setMinting] = useState(false);
   const [mintError, setMintError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   const handleMint = async () => {
     if (!wallet) {
@@ -50,6 +60,52 @@ export function DetailPanel({
       setMintError(err instanceof Error ? err.message : "Mint failed");
     } finally {
       setMinting(false);
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    if (!authenticated) return;
+    setSaving(true);
+    setSaveSuccess(false);
+    setMintError(null);
+    try {
+      // Build the image URL from the selected variation's render endpoint
+      const renderData = encodeURIComponent(
+        JSON.stringify({
+          templateId: variation.templateId,
+          seed: variation.seed,
+          palette: variation.palette,
+          params: variation.params,
+          format: "svg",
+        })
+      );
+      const imageUrl = `/api/render?data=${renderData}`;
+
+      const res = await fetch("/api/drafts", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          type: "ai",
+          title: variation.description || `AI Draft — ${prompt.slice(0, 50)}`,
+          data: {
+            prompt,
+            preset,
+            variations: allVariations || [variation],
+            selectedIdx: selectedIndex ?? 0,
+          },
+          imageUrl,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error ?? "Save failed");
+      }
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err) {
+      setMintError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -153,17 +209,28 @@ export function DetailPanel({
         <Button variant="outline" className="w-full" onClick={onMoreLikeThis}>
           Iterate Further
         </Button>
-        <Button
-          className="w-full"
-          onClick={handleMint}
-          disabled={minting || !wallet}
-        >
-          {minting
-            ? "Preparing..."
-            : !wallet
-            ? "Auth Required to Mint"
-            : "Inscribe to Chain"}
-        </Button>
+        <div className="flex gap-3">
+          <Button
+            variant="outline"
+            className="flex-1 gap-2"
+            onClick={handleSaveDraft}
+            disabled={saving || !authenticated}
+          >
+            <Save size={12} />
+            {saving ? "Saving..." : saveSuccess ? "Saved!" : "Save Draft"}
+          </Button>
+          <Button
+            className="flex-1"
+            onClick={handleMint}
+            disabled={minting || !wallet}
+          >
+            {minting
+              ? "Preparing..."
+              : !wallet
+              ? "Auth Required"
+              : "Mint"}
+          </Button>
+        </div>
         {mintError && (
           <div className="font-mono text-[10px] text-[var(--danger)] uppercase tracking-widest">
             {mintError}

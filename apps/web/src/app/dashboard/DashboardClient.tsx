@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { fadeUp, staggerContainer } from "@/lib/animations";
-import type { DashboardData, DashboardMint, ActivityItem } from "@/types/dashboard";
+import type { DashboardData, DashboardMint, ActivityItem, DraftItem } from "@/types/dashboard";
 
 export default function DashboardClient() {
   const { publicKey } = useWallet();
@@ -211,6 +211,66 @@ export default function DashboardClient() {
               )}
             </div>
           </div>
+
+          {/* Drafts Section */}
+          {data?.drafts && data.drafts.length > 0 && (
+            <motion.div
+              initial="hidden"
+              animate="show"
+              variants={fadeUp}
+              className="border border-[var(--border)]"
+            >
+              <div className="p-6 border-b border-[var(--border)] flex justify-between items-center">
+                <h2 className="font-mono text-xs text-[var(--text-dim)] uppercase tracking-widest">
+                  Saved Drafts
+                </h2>
+                <span className="font-mono text-[10px] text-[var(--text-dim)] uppercase tracking-widest">
+                  {data.drafts.length} draft{data.drafts.length !== 1 ? "s" : ""}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-px bg-[var(--border)]">
+                {data.drafts.map((draft: DraftItem) => (
+                  <Link
+                    key={draft.id}
+                    href={
+                      draft.type === "code"
+                        ? `/studio/code?draft=${draft.id}`
+                        : draft.type === "manual"
+                        ? `/studio/manual?draft=${draft.id}`
+                        : `/studio?draft=${draft.id}`
+                    }
+                    className="bg-[var(--bg)] p-4 hover:bg-[var(--bg-card)] transition-colors group no-underline flex flex-col"
+                  >
+                    <div className="aspect-square bg-[var(--bg-card)] border border-[var(--border)] mb-3 overflow-hidden flex items-center justify-center">
+                      {draft.imageUrl ? (
+                        <img
+                          src={draft.imageUrl}
+                          alt={draft.title ?? "Draft"}
+                          className="w-full h-full object-cover filter grayscale group-hover:grayscale-0 transition-all duration-500"
+                        />
+                      ) : (
+                        <span className="font-serif text-2xl italic text-[var(--border)]">
+                          {draft.type === "code" ? "</>" : draft.type === "ai" ? "AI" : "P"}
+                        </span>
+                      )}
+                    </div>
+                    <div className="font-mono text-[10px] text-[var(--accent)] uppercase tracking-widest mb-1">
+                      {draft.type}
+                    </div>
+                    <div className="font-mono text-xs text-white group-hover:text-[var(--accent)] transition-colors truncate">
+                      {draft.title ?? "Untitled Draft"}
+                    </div>
+                    <div className="font-mono text-[10px] text-[var(--text-dim)] mt-1">
+                      {new Date(draft.updatedAt).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </motion.div>
+          )}
 
           {/* Activity Section */}
           {data?.recentActivity && data.recentActivity.length > 0 && (

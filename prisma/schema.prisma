@@ -8,14 +8,16 @@ datasource db {
 }
 
 model Draft {
-  id          String   @id @default(cuid())
-  prompt      String
-  preset      String?
-  templateId  String?
-  variations  String   // JSON array of Variation objects
-  selectedIdx Int?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  wallet    String
+  type      String   @default("ai") // "ai" | "code" | "manual"
+  title     String?
+  data      String   // JSON blob with type-specific data
+  imageUrl  String?  // preview thumbnail URL or data URL
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([wallet])
 }
 
 model Mint {
