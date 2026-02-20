@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { Header } from "@/components/Header";
-import { stableStringify, computeHash, type CanonicalInput } from "@artmint/common";
-import { RENDERER_VERSION } from "@artmint/render";
+import type { CanonicalInput } from "@artmint/common";
 
 interface MintData {
   id: string;
@@ -37,6 +36,7 @@ export function AssetClient({ mint }: { mint: MintData }) {
   const [listError, setListError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [showLive, setShowLive] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const canonicalInput = useMemo(() => {
     try {
@@ -52,8 +52,77 @@ export function AssetClient({ mint }: { mint: MintData }) {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  /**
+   * Client-side 4K export: fetch the SVG from the render API at 1080px,
+   * then render it to a canvas at 3840px and export as PNG.
+   * This avoids needing the server to render at 3840.
+   */
+  const handleExport4K = useCallback(async () => {
+    if (!canonicalInput) return;
+    setExporting(true);
+
+    try {
+      const params = encodeURIComponent(
+        JSON.stringify({
+          templateId: canonicalInput.templateId,
+          seed: canonicalInput.seed,
+          palette: canonicalInput.palette,
+          params: canonicalInput.params,
+          format: "svg",
+        })
+      );
+
+      const res = await fetch(`/api/render?data=${params}`);
+      if (!res.ok) throw new Error("Failed to fetch SVG");
+      const svgText = await res.text();
+
+      const SIZE = 3840;
+      const blob = new Blob([svgText], { type: "image/svg+xml" });
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = SIZE;
+        canvas.height = SIZE;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          setExporting(false);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, SIZE, SIZE);
+        URL.revokeObjectURL(url);
+
+        canvas.toBlob(
+          (pngBlob) => {
+            if (!pngBlob) {
+              setExporting(false);
+              return;
+            }
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(pngBlob);
+            a.download = `artmint-${canonicalInput.templateId}-${canonicalInput.seed}-4K.png`;
+            a.click();
+            URL.revokeObjectURL(a.href);
+            setExporting(false);
+          },
+          "image/png"
+        );
+      };
+
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        setExporting(false);
+      };
+
+      img.src = url;
+    } catch {
+      setExporting(false);
+    }
+  }, [canonicalInput]);
+
   const handleRerender4K = () => {
-    // Open the HTML artifact in a new tab — it has built-in 4K export
+    // Open the HTML artifact in a new tab — it has built-in 4K export too
     window.open(mint.animationUrl, "_blank");
   };
 
@@ -70,6 +139,7 @@ export function AssetClient({ mint }: { mint: MintData }) {
     setListError(null);
 
     try {
+      // Wallet comes from session cookie — no need to send in body
       const res = await fetch("/api/listing", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -202,8 +272,15 @@ export function AssetClient({ mint }: { mint: MintData }) {
               <button onClick={handleCopyParams} style={{ fontSize: 12, flex: 1 }}>
                 {copied ? "Copied!" : "Copy params"}
               </button>
+              <button
+                onClick={handleExport4K}
+                disabled={exporting}
+                style={{ fontSize: 12, flex: 1 }}
+              >
+                {exporting ? "Exporting..." : "Export 4K PNG"}
+              </button>
               <button onClick={handleRerender4K} style={{ fontSize: 12, flex: 1 }}>
-                Re-render 4K
+                Open Artifact
               </button>
             </div>
           </div>

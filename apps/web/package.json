@@ -9,7 +9,8 @@
     "lint": "next lint",
     "prisma:migrate": "prisma migrate dev --schema=../../prisma/schema.prisma",
     "prisma:studio": "prisma studio --schema=../../prisma/schema.prisma",
-    "prisma:generate": "prisma generate --schema=../../prisma/schema.prisma"
+    "prisma:generate": "prisma generate --schema=../../prisma/schema.prisma",
+    "test": "vitest run"
   },
   "dependencies": {
     "@artmint/ai": "workspace:*",
@@ -25,16 +26,21 @@
     "@solana/wallet-adapter-react-ui": "^0.9.35",
     "@solana/wallet-adapter-wallets": "^0.19.32",
     "@solana/web3.js": "^1.95.0",
+    "bs58": "^5.0.0",
     "next": "^14.2.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
+    "tweetnacl": "^1.0.3",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "^14.2.35",
     "prisma": "5.22.0",
-    "typescript": "^5.5.0"
+    "typescript": "^5.5.0",
+    "vitest": "^2.1.9"
   }
 }

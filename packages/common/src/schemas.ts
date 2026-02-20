@@ -37,12 +37,33 @@ export const templateParamsSchema = z.discriminatedUnion("templateId", [
 
 export const variationSchema = z.object({
   templateId: z.enum(templateIds),
-  seed: z.number().int().min(0),
+  seed: z.number().int().min(0).max(999999999),
   palette: z.array(hexColor).min(2).max(8),
   params: z.union([flowFieldsParamsSchema, jazzNoirParamsSchema]),
-  title: z.string().optional(),
-  description: z.string().optional(),
-  tags: z.array(z.string()).optional(),
+  title: z.string().max(200).optional(),
+  description: z.string().max(500).optional(),
+  tags: z.array(z.string().max(50)).max(10).optional(),
+}).superRefine((data, ctx) => {
+  // Validate that params match the templateId
+  if (data.templateId === "flow_fields") {
+    const result = flowFieldsParamsSchema.safeParse(data.params);
+    if (!result.success) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Params do not match flow_fields template schema",
+        path: ["params"],
+      });
+    }
+  } else if (data.templateId === "jazz_noir") {
+    const result = jazzNoirParamsSchema.safeParse(data.params);
+    if (!result.success) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Params do not match jazz_noir template schema",
+        path: ["params"],
+      });
+    }
+  }
 });
 export type Variation = z.infer<typeof variationSchema>;
 

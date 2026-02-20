@@ -41,7 +41,6 @@ export function DetailPanel({
         body: JSON.stringify({
           ...variation,
           prompt,
-          wallet,
         }),
       });
 

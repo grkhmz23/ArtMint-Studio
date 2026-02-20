@@ -43,3 +43,45 @@ model Listing {
   updatedAt     DateTime @updatedAt
   mint          Mint     @relation(fields: [mintAddress], references: [mintAddress])
 }
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+
+model AuthNonce {
+  id        String   @id @default(cuid())
+  nonce     String   @unique
+  wallet    String?  // set once claimed by verify
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  wallet    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+// ── Usage quotas & rate limiting ─────────────────────────────────────────────
+
+model UsageCounter {
+  id         String   @id @default(cuid())
+  date       String   // YYYY-MM-DD
+  userWallet String
+  action     String   // e.g. "ai_variation", "mint"
+  count      Int      @default(0)
+  updatedAt  DateTime @updatedAt
+
+  @@unique([date, userWallet, action])
+}
+
+model RateLimitWindow {
+  id          String   @id @default(cuid())
+  key         String   // e.g. "ai:ip:1.2.3.4" or "ai:wallet:abc..."
+  windowStart DateTime
+  count       Int      @default(0)
+  updatedAt   DateTime @updatedAt
+
+  @@unique([key])
+}

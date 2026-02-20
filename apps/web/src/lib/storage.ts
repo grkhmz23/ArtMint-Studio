@@ -1,5 +1,5 @@
 import { writeFileSync, mkdirSync, existsSync } from "fs";
-import { join } from "path";
+import { join, resolve, basename } from "path";
 
 const STORAGE_DIR = join(process.cwd(), "public", "uploads");
 
@@ -22,17 +22,27 @@ export async function uploadFile(
 
   if (provider === "local") {
     ensureDir(STORAGE_DIR);
-    const filePath = join(STORAGE_DIR, filename);
+
+    // Sanitize filename: strip path components to prevent directory traversal
+    const safeFilename = basename(filename).replace(/[^a-zA-Z0-9._-]/g, "_");
+    if (!safeFilename) {
+      throw new Error("Invalid filename");
+    }
+
+    const filePath = resolve(STORAGE_DIR, safeFilename);
+
+    // Double-check the resolved path is within STORAGE_DIR
+    if (!filePath.startsWith(resolve(STORAGE_DIR))) {
+      throw new Error("Invalid file path");
+    }
+
     writeFileSync(filePath, data);
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-    return { url: `${baseUrl}/uploads/${filename}` };
+    return { url: `${baseUrl}/uploads/${safeFilename}` };
   }
 
-  // For irys/nftstorage, you'd implement the upload logic here
-  // For MVP, we fall back to local
-  ensureDir(STORAGE_DIR);
-  const filePath = join(STORAGE_DIR, filename);
-  writeFileSync(filePath, data);
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  return { url: `${baseUrl}/uploads/${filename}` };
+  throw new Error(
+    `Storage provider "${provider}" is not implemented. ` +
+    `Set STORAGE_PROVIDER=local for development, or implement the "${provider}" upload handler.`
+  );
 }
