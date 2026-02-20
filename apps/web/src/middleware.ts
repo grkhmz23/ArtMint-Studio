@@ -11,11 +11,20 @@ export function middleware(req: NextRequest) {
   // CORS: only allow same-origin requests to API routes
   if (req.nextUrl.pathname.startsWith("/api/")) {
     // Allow requests with no origin (same-origin, server-to-server)
-    if (origin && origin !== appUrl) {
-      return NextResponse.json(
-        { error: "CORS: origin not allowed" },
-        { status: 403 }
-      );
+    if (origin) {
+      // Compare host portion to handle http/https and trailing slash differences
+      const allowedHost = new URL(appUrl).host;
+      const requestHost = new URL(req.url).host;
+      const originHost = (() => {
+        try { return new URL(origin).host; } catch { return ""; }
+      })();
+      // Allow if origin matches the app URL or the request's own host
+      if (originHost !== allowedHost && originHost !== requestHost) {
+        return NextResponse.json(
+          { error: "CORS: origin not allowed" },
+          { status: 403 }
+        );
+      }
     }
   }
 
@@ -41,7 +50,7 @@ export function middleware(req: NextRequest) {
         "default-src 'self'",
         "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net",
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
-        "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net",
+        "font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net",
         "img-src 'self' data: blob: http://localhost:* https:",
         "connect-src 'self' https://api.devnet.solana.com https://api.mainnet-beta.solana.com https://*.helius-rpc.com https://cdn.jsdelivr.net wss:",
         "worker-src 'self' blob:",
