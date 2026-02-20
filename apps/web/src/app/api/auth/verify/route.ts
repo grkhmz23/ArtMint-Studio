@@ -3,6 +3,8 @@ import { z } from "zod";
 import nacl from "tweetnacl";
 import bs58 from "bs58";
 import { prisma } from "@/lib/db";
+
+export const dynamic = "force-dynamic";
 import {
   buildSignMessage,
   createSessionToken,

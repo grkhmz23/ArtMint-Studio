@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionWallet } from "@/lib/auth";
 import { getQuotaInfo } from "@/lib/quota";
 
+export const dynamic = "force-dynamic";
+
 /**
  * GET /api/quota
  * Returns remaining AI generation quota for the authenticated user.

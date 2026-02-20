@@ -4,6 +4,8 @@ import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 import { verifyTransaction } from "@/lib/solana-verify";
 
+export const dynamic = "force-dynamic";
+
 const confirmSchema = z.object({
   placeholderMintAddress: z.string().min(1),
   mintAddress: z.string().min(32).max(50),

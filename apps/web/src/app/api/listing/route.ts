@@ -3,6 +3,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
 const listingSchema = z.object({
   mintAddress: z.string().min(1),
   priceLamports: z.string().regex(/^\d+$/, "Must be a positive integer string"),

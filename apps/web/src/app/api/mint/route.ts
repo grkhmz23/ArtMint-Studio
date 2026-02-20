@@ -3,6 +3,8 @@ import { z } from "zod";
 import { generateSVG, renderPNGFromSVG, buildHtmlArtifact, RENDERER_VERSION } from "@artmint/render";
 import { computeHash, stableStringify, flowFieldsParamsSchema, jazzNoirParamsSchema } from "@artmint/common";
 import { uploadFile } from "@/lib/storage";
+
+export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/db";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth";

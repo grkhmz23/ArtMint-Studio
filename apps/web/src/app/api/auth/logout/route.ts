@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { clearSessionCookie } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
 /**
  * POST /api/auth/logout
  * Clears the session cookie and deletes the DB session.

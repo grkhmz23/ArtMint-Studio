@@ -3,6 +3,8 @@ import { z } from "zod";
 import { generateVariations } from "@artmint/ai";
 import { templateIds } from "@artmint/common";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+
+export const dynamic = "force-dynamic";
 import { requireAuth } from "@/lib/auth";
 import { checkAndIncrementQuota } from "@/lib/quota";
 

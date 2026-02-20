@@ -4,6 +4,8 @@ import { generateSVG, renderPNGFromSVG } from "@artmint/render";
 import { templateIds } from "@artmint/common";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
+export const dynamic = "force-dynamic";
+
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Must be a hex color like #ff00aa");
 
 const renderSchema = z.object({

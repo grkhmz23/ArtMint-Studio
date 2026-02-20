@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionWallet } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
 /**
  * GET /api/auth/session
  * Returns the current session wallet if authenticated.
