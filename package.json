@@ -1,0 +1,32 @@
+{
+  "name": "artmint-studio",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter @artmint/web dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "db:migrate": "pnpm --filter @artmint/web prisma:migrate",
+    "db:studio": "pnpm --filter @artmint/web prisma:studio",
+    "lint": "pnpm -r lint"
+  },
+  "engines": {
+    "node": ">=18",
+    "pnpm": ">=8"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "@resvg/resvg-js",
+      "esbuild"
+    ]
+  },
+  "devDependencies": {
+    "prisma": "5.22.0"
+  },
+  "dependencies": {
+    "@prisma/client": "5.22.0"
+  }
+}

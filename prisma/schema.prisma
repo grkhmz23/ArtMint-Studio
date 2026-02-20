@@ -1,0 +1,45 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Draft {
+  id          String   @id @default(cuid())
+  prompt      String
+  preset      String?
+  templateId  String?
+  variations  String   // JSON array of Variation objects
+  selectedIdx Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Mint {
+  id           String   @id @default(cuid())
+  mintAddress  String   @unique
+  inputJson    String   // Canonical input JSON
+  hash         String
+  imageUrl     String
+  animationUrl String
+  metadataUrl  String
+  title        String?
+  wallet       String
+  createdAt    DateTime @default(now())
+  listing      Listing?
+}
+
+model Listing {
+  id            String   @id @default(cuid())
+  mintAddress   String   @unique
+  priceLamports BigInt
+  status        String   @default("pending") // pending, active, sold, cancelled
+  txSignature   String?
+  saleStateKey  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  mint          Mint     @relation(fields: [mintAddress], references: [mintAddress])
+}
