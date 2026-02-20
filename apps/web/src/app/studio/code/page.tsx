@@ -76,6 +76,7 @@ export default function CodeStudioPage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           code,
+          mode,
           seed,
           palette,
           title: title || undefined,

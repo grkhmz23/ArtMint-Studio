@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { buildCustomCodeArtifact, RENDERER_VERSION } from "@artmint/render";
+import { buildCustomCodeArtifact, buildCustomSvgArtifact, RENDERER_VERSION } from "@artmint/render";
 import { computeHash, stableStringify } from "@artmint/common";
 import { uploadFile } from "@/lib/storage";
 
@@ -13,6 +13,7 @@ const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 
 const customMintSchema = z.object({
   code: z.string().min(1).max(100_000),
+  mode: z.enum(["svg", "javascript"]).default("svg"),
   seed: z.number().int().min(0).max(999999999),
   palette: z.array(hexColor).min(2).max(8),
   title: z.string().max(200).optional(),
@@ -37,6 +38,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Body size guard — reject before full parse if Content-Length is excessive
+    const contentLength = req.headers.get("content-length");
+    if (contentLength && parseInt(contentLength, 10) > 12_000_000) {
+      return NextResponse.json({ error: "Request body too large" }, { status: 413 });
+    }
+
     const body = await req.json();
     const parsed = customMintSchema.safeParse(body);
 
@@ -47,7 +54,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { code, seed, palette, title, description, pngBase64 } = parsed.data;
+    const { code, mode, seed, palette, title, description, pngBase64 } = parsed.data;
 
     // Decode base64 PNG from client canvas capture
     const pngData = pngBase64.replace(/^data:image\/png;base64,/, "");
@@ -66,8 +73,10 @@ export async function POST(req: NextRequest) {
     const hash = computeHash(deterministicInput);
     const canonicalInput = { ...deterministicInput, createdAt };
 
-    // Build HTML artifact
-    const htmlArtifact = buildCustomCodeArtifact({ code, seed, palette });
+    // Build HTML artifact — use the right builder based on code mode
+    const htmlArtifact = mode === "svg"
+      ? buildCustomSvgArtifact({ code })
+      : buildCustomCodeArtifact({ code, seed, palette });
 
     // Upload assets
     const fileId = `custom-${seed}-${hash.slice(0, 8)}`;

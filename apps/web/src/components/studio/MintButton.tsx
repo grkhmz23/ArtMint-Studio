@@ -20,6 +20,7 @@ export function MintButton({ onMint, disabled }: Props) {
     try {
       await onMint();
       setSuccess(true);
+      setTimeout(() => setSuccess(false), 5000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Mint failed");
     } finally {

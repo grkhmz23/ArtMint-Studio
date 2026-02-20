@@ -7,6 +7,72 @@ interface CustomCodeArtifactInput {
 }
 
 /**
+ * Build a self-contained HTML artifact for custom SVG code.
+ * Embeds user SVG directly with resolution controls + PNG export.
+ */
+export function buildCustomSvgArtifact(input: { code: string }): string {
+  // Strip script tags from SVG for safety, escape for embedding
+  const safeSvg = input.code
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/</g, "\\u003c");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>ArtMint – Custom SVG</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0a;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:monospace;color:#ccc}
+#preview{max-width:100vmin;max-height:100vmin;border:1px solid #333}
+#preview svg{max-width:100%;max-height:100%;display:block}
+canvas{display:none}
+.controls{margin-top:16px;display:flex;gap:8px}
+button{background:#222;color:#fff;border:1px solid #555;padding:8px 16px;cursor:pointer;font-family:monospace;font-size:12px}
+button:hover{background:#333}
+</style>
+</head>
+<body>
+<div id="preview"></div>
+<canvas id="canvas"></canvas>
+<div class="controls">
+<button onclick="exportPNG(1080)">1080px</button>
+<button onclick="exportPNG(2160)">2160px</button>
+<button onclick="exportPNG(3840)">4K</button>
+</div>
+<script>
+var svgStr = "${safeSvg}";
+document.getElementById('preview').innerHTML = svgStr;
+
+function exportPNG(size) {
+  var svgEl = document.querySelector('#preview svg');
+  if (!svgEl) return;
+  var data = new XMLSerializer().serializeToString(svgEl);
+  var blob = new Blob([data], { type: 'image/svg+xml' });
+  var url = URL.createObjectURL(blob);
+  var img = new Image();
+  img.onload = function() {
+    var c = document.getElementById('canvas');
+    c.width = size; c.height = size;
+    var ctx = c.getContext('2d');
+    ctx.drawImage(img, 0, 0, size, size);
+    URL.revokeObjectURL(url);
+    c.toBlob(function(b) {
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(b);
+      a.download = 'artmint-custom-svg-' + size + 'px.png';
+      a.click();
+    }, 'image/png');
+  };
+  img.src = url;
+}
+</script>
+</body>
+</html>`;
+}
+
+/**
  * Build a self-contained HTML artifact for custom user code.
  * Embeds user code + mulberry32 PRNG + noise2D helpers in a canvas-based page.
  */

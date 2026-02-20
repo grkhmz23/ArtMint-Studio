@@ -25,7 +25,9 @@ export function ParameterSliders({ templateId, params, onChange }: Props) {
           <div className="flex justify-between text-xs">
             <span className="text-muted">{m.label}</span>
             <span className="font-mono text-foreground">
-              {Number.isInteger(m.step) ? params[key] : params[key]?.toFixed(2)}
+              {params[key] != null
+                ? (Number.isInteger(m.step) ? params[key] : params[key].toFixed(2))
+                : m.min}
             </span>
           </div>
           <input

@@ -29,7 +29,7 @@ export function PaletteEditor({ palette, onChange }: Props) {
       <label className="text-xs font-medium text-muted">Palette</label>
       <div className="flex flex-wrap items-center gap-2">
         {palette.map((color, i) => (
-          <div key={i} className="relative group">
+          <div key={`${i}-${color}`} className="relative group">
             <input
               type="color"
               value={color}
