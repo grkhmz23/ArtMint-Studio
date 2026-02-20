@@ -1,4 +1,4 @@
-import type { CanonicalInput, TemplateId } from "@artmint/common";
+import type { TemplateId } from "@artmint/common";
 import { renderFlowFields } from "./templates/flow-fields";
 import { renderJazzNoir } from "./templates/jazz-noir";
 
@@ -27,6 +27,8 @@ export function generateSVG(input: GenerateInput): string {
         palette: input.palette,
         params: input.params as Parameters<typeof renderJazzNoir>[0]["params"],
       });
+    case "custom_code":
+      throw new Error("custom_code template cannot be rendered server-side");
     default: {
       const _exhaustive: never = input.templateId;
       throw new Error(`Unknown template: ${_exhaustive}`);
