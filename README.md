@@ -96,6 +96,30 @@ Dark abstract cityscapes with neon circles, lines, and skyline bands. Parameters
 - **Jazz Noir**: Dark cityscapes, neon reflections, smoky atmosphere
 - **BONK Mode**: Chaotic energy, maximum vibrancy
 
+## Upload & Mint (Raster Pipeline)
+
+Use `/upload` to mint existing artwork while preserving provenance.
+
+**What gets stored**
+- Original file (downloadable) for provenance
+- Optimized mint image (WebP/PNG) for marketplace performance
+- Thumbnail (WebP, 512px max)
+
+**Limits & rules**
+- Allowed: PNG, JPG, WebP (GIF optional)
+- SVG is rejected (use Live Coding flow)
+- Max original file size: 25MB
+- Max input dimensions: 8192px
+- Mint size: 2048 or 4096 max side
+- Thumbnail size: 512 max side
+- EXIF is stripped from optimized outputs
+
+**Flow**
+1. Open `/upload`
+2. Upload an image and choose optimization settings
+3. Click **Prepare for Mint** (client-side resize/compress)
+4. Click **Mint** to upload original + mint + thumbnail
+
 ## Demo Script (3-min video)
 
 1. **Open Studio** (`/studio`) — show the prompt input and preset buttons

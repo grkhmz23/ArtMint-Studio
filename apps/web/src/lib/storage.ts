@@ -1,6 +1,7 @@
 import { writeFileSync, mkdirSync, existsSync } from "fs";
-import { join, resolve, basename } from "path";
+import { join, resolve } from "path";
 import { put } from "@vercel/blob";
+import { sanitizeFilename } from "@/lib/filename";
 
 const STORAGE_DIR = join(process.cwd(), "public", "uploads");
 
@@ -32,7 +33,7 @@ export async function uploadFile(
   const provider = process.env.STORAGE_PROVIDER ?? "local";
 
   if (provider === "vercel-blob") {
-    const safeFilename = basename(filename).replace(/[^a-zA-Z0-9._-]/g, "_");
+    const safeFilename = sanitizeFilename(filename);
     if (!safeFilename) {
       throw new Error("Invalid filename");
     }
@@ -58,7 +59,7 @@ export async function uploadFile(
     ensureDir(STORAGE_DIR);
 
     // Sanitize filename: strip path components to prevent directory traversal
-    const safeFilename = basename(filename).replace(/[^a-zA-Z0-9._-]/g, "_");
+    const safeFilename = sanitizeFilename(filename);
     if (!safeFilename) {
       throw new Error("Invalid filename");
     }

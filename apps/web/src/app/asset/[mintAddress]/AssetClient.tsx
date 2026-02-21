@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
 import { fadeUp } from "@/lib/animations";
 import type { CanonicalInput } from "@artmint/common";
+import type { UploadProvenance } from "@/lib/upload-metadata";
 import { cn } from "@/lib/utils";
 
 interface MintData {
@@ -42,13 +43,17 @@ export function AssetClient({ mint }: { mint: MintData }) {
   const [showLive, setShowLive] = useState(false);
   const [exporting, setExporting] = useState(false);
 
-  const canonicalInput = useMemo(() => {
+  const parsedInput = useMemo(() => {
     try {
-      return JSON.parse(mint.inputJson) as CanonicalInput;
+      return JSON.parse(mint.inputJson) as CanonicalInput | UploadProvenance;
     } catch {
       return null;
     }
   }, [mint.inputJson]);
+
+  const isUpload = !!parsedInput && (parsedInput as UploadProvenance).kind === "upload";
+  const canonicalInput = !isUpload ? (parsedInput as CanonicalInput | null) : null;
+  const uploadInput = isUpload ? (parsedInput as UploadProvenance) : null;
 
   const handleCopyParams = async () => {
     await navigator.clipboard.writeText(mint.inputJson);
@@ -148,12 +153,19 @@ export function AssetClient({ mint }: { mint: MintData }) {
     }
   };
 
-  const provenanceRows = [
-    { label: "Algorithm", value: canonicalInput?.templateId ?? "---" },
-    { label: "Seed Config", value: String(canonicalInput?.seed ?? "---") },
-    { label: "Core Engine", value: canonicalInput?.rendererVersion ?? "---" },
-    { label: "Tx Hash", value: mint.hash.slice(0, 8) + "..." + mint.hash.slice(-4) },
-  ];
+  const provenanceRows = isUpload
+    ? [
+        { label: "Kind", value: "upload" },
+        { label: "Original SHA-256", value: uploadInput?.original.sha256 ?? "---" },
+        { label: "Original File", value: uploadInput?.original.filename ?? "---" },
+        { label: "Original MIME", value: uploadInput?.original.mime ?? "---" },
+      ]
+    : [
+        { label: "Algorithm", value: canonicalInput?.templateId ?? "---" },
+        { label: "Seed Config", value: String(canonicalInput?.seed ?? "---") },
+        { label: "Core Engine", value: canonicalInput?.rendererVersion ?? "---" },
+        { label: "Tx Hash", value: mint.hash.slice(0, 8) + "..." + mint.hash.slice(-4) },
+      ];
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -165,30 +177,32 @@ export function AssetClient({ mint }: { mint: MintData }) {
           {/* Artwork Display */}
           <div className="flex-1 w-full max-w-[800px]">
             {/* View toggle */}
-            <div className="flex gap-2 mb-4">
-              <button
-                onClick={() => setShowLive(false)}
-                className={cn(
-                  "font-mono text-[10px] uppercase tracking-widest px-4 py-2 border transition-colors",
-                  !showLive
-                    ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/5"
-                    : "border-[var(--border)] text-[var(--text-dim)] hover:text-white"
-                )}
-              >
-                Static
-              </button>
-              <button
-                onClick={() => setShowLive(true)}
-                className={cn(
-                  "font-mono text-[10px] uppercase tracking-widest px-4 py-2 border transition-colors",
-                  showLive
-                    ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/5"
-                    : "border-[var(--border)] text-[var(--text-dim)] hover:text-white"
-                )}
-              >
-                Live Render
-              </button>
-            </div>
+            {!isUpload && (
+              <div className="flex gap-2 mb-4">
+                <button
+                  onClick={() => setShowLive(false)}
+                  className={cn(
+                    "font-mono text-[10px] uppercase tracking-widest px-4 py-2 border transition-colors",
+                    !showLive
+                      ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/5"
+                      : "border-[var(--border)] text-[var(--text-dim)] hover:text-white"
+                  )}
+                >
+                  Static
+                </button>
+                <button
+                  onClick={() => setShowLive(true)}
+                  className={cn(
+                    "font-mono text-[10px] uppercase tracking-widest px-4 py-2 border transition-colors",
+                    showLive
+                      ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/5"
+                      : "border-[var(--border)] text-[var(--text-dim)] hover:text-white"
+                  )}
+                >
+                  Live Render
+                </button>
+              </div>
+            )}
 
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -196,7 +210,7 @@ export function AssetClient({ mint }: { mint: MintData }) {
               transition={{ duration: 0.8 }}
               className="aspect-square bg-black border border-[var(--border)] relative p-2 md:p-6 pb-12 md:pb-20"
             >
-              {showLive ? (
+              {!isUpload && showLive ? (
                 <iframe
                   src={mint.animationUrl}
                   sandbox="allow-scripts"
@@ -212,7 +226,7 @@ export function AssetClient({ mint }: { mint: MintData }) {
               )}
               <div className="absolute bottom-4 left-6 right-6 flex justify-between items-end">
                 <span className="font-serif text-2xl italic text-white/50">
-                  {mint.title ?? `ArtMint #${canonicalInput?.seed ?? ""}`}
+                  {mint.title ?? (isUpload ? "ArtMint Upload" : `ArtMint #${canonicalInput?.seed ?? ""}`)}
                 </span>
                 <span className="font-mono text-[10px] text-[var(--text-dim)] uppercase tracking-widest">
                   1/1 Edition
@@ -230,7 +244,7 @@ export function AssetClient({ mint }: { mint: MintData }) {
               className="border-b border-[var(--border)] pb-8"
             >
               <h1 className="font-serif text-5xl text-white mb-4">
-                {mint.title ?? `ArtMint #${canonicalInput?.seed ?? ""}`}
+                {mint.title ?? (isUpload ? "ArtMint Upload" : `ArtMint #${canonicalInput?.seed ?? ""}`)}
               </h1>
               <p className="font-mono text-xs text-[var(--accent)] uppercase tracking-widest bg-[var(--accent)]/10 px-3 py-1 inline-block border border-[var(--accent)]">
                 Address: {mint.mintAddress.slice(0, 6)}...{mint.mintAddress.slice(-4)}
@@ -258,7 +272,84 @@ export function AssetClient({ mint }: { mint: MintData }) {
                   </div>
                 ))}
               </div>
-              {canonicalInput?.palette && (
+              {isUpload && uploadInput && (
+                <div className="space-y-3">
+                  <div className="flex justify-between border-b border-[var(--border)]/30 pb-1">
+                    <span className="text-[var(--text-dim)]">Original Size</span>
+                    <span className="text-white">
+                      {uploadInput.original.width}x{uploadInput.original.height}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-b border-[var(--border)]/30 pb-1">
+                    <span className="text-[var(--text-dim)]">Original Bytes</span>
+                    <span className="text-white">{uploadInput.original.bytes}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-[var(--border)]/30 pb-1">
+                    <span className="text-[var(--text-dim)]">Mint Format</span>
+                    <span className="text-white">{uploadInput.mint.format}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-[var(--border)]/30 pb-1">
+                    <span className="text-[var(--text-dim)]">Mint MIME</span>
+                    <span className="text-white">{uploadInput.mint.mime}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-[var(--border)]/30 pb-1">
+                    <span className="text-[var(--text-dim)]">Mint Size</span>
+                    <span className="text-white">
+                      {uploadInput.mint.width}x{uploadInput.mint.height}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-b border-[var(--border)]/30 pb-1">
+                    <span className="text-[var(--text-dim)]">Mint Bytes</span>
+                    <span className="text-white">{uploadInput.mint.bytes}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-[var(--border)]/30 pb-1">
+                    <span className="text-[var(--text-dim)]">Compression</span>
+                    <span className="text-white">
+                      {uploadInput.mint.quality !== null ? uploadInput.mint.quality.toFixed(2) : "lossless"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-b border-[var(--border)]/30 pb-1">
+                    <span className="text-[var(--text-dim)]">Thumbnail</span>
+                    <span className="text-white">
+                      {uploadInput.thumbnail.width}x{uploadInput.thumbnail.height}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-b border-[var(--border)]/30 pb-1">
+                    <span className="text-[var(--text-dim)]">App Version</span>
+                    <span className="text-white">{uploadInput.appVersion ?? "---"}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-[var(--border)]/30 pb-1">
+                    <span className="text-[var(--text-dim)]">Renderer</span>
+                    <span className="text-white">{uploadInput.rendererVersion ?? "---"}</span>
+                  </div>
+                </div>
+              )}
+              {uploadInput && (
+                <div className="space-y-2 pt-4">
+                  <a
+                    href={uploadInput.original.url}
+                    download
+                    className="block border border-[var(--border)] px-3 py-2 text-[10px] font-mono uppercase tracking-widest text-[var(--text-dim)] hover:text-white hover:border-white transition-colors"
+                  >
+                    Download Original
+                  </a>
+                  <a
+                    href={uploadInput.mint.url}
+                    download
+                    className="block border border-[var(--border)] px-3 py-2 text-[10px] font-mono uppercase tracking-widest text-[var(--text-dim)] hover:text-white hover:border-white transition-colors"
+                  >
+                    Download Mint Image
+                  </a>
+                  <a
+                    href={uploadInput.thumbnail.url}
+                    download
+                    className="block border border-[var(--border)] px-3 py-2 text-[10px] font-mono uppercase tracking-widest text-[var(--text-dim)] hover:text-white hover:border-white transition-colors"
+                  >
+                    Download Thumbnail
+                  </a>
+                </div>
+              )}
+              {!isUpload && canonicalInput?.palette && (
                 <div>
                   <span className="text-[10px] text-[var(--text-dim)] block mb-2">
                     Palette
@@ -337,25 +428,29 @@ export function AssetClient({ mint }: { mint: MintData }) {
 
             {/* Action buttons */}
             <motion.div initial="hidden" animate="show" variants={fadeUp} className="flex gap-4">
-              <button
-                onClick={handleExport4K}
-                disabled={exporting}
-                className="flex-1 border border-[var(--border)] py-3 font-mono text-[10px] uppercase tracking-widest text-[var(--text-dim)] hover:text-white hover:border-white transition-colors disabled:opacity-50"
-              >
-                {exporting ? "Exporting..." : "Download 4K"}
-              </button>
+              {!isUpload && (
+                <button
+                  onClick={handleExport4K}
+                  disabled={exporting}
+                  className="flex-1 border border-[var(--border)] py-3 font-mono text-[10px] uppercase tracking-widest text-[var(--text-dim)] hover:text-white hover:border-white transition-colors disabled:opacity-50"
+                >
+                  {exporting ? "Exporting..." : "Download 4K"}
+                </button>
+              )}
               <button
                 onClick={handleCopyParams}
                 className="flex-1 border border-[var(--border)] py-3 font-mono text-[10px] uppercase tracking-widest text-[var(--text-dim)] hover:text-white hover:border-white transition-colors"
               >
-                {copied ? "Copied!" : "Extract Source"}
+                {copied ? "Copied!" : isUpload ? "Copy Provenance" : "Extract Source"}
               </button>
-              <button
-                onClick={handleRerender4K}
-                className="flex-1 border border-[var(--border)] py-3 font-mono text-[10px] uppercase tracking-widest text-[var(--text-dim)] hover:text-white hover:border-white transition-colors"
-              >
-                Open Artifact
-              </button>
+              {!isUpload && (
+                <button
+                  onClick={handleRerender4K}
+                  className="flex-1 border border-[var(--border)] py-3 font-mono text-[10px] uppercase tracking-widest text-[var(--text-dim)] hover:text-white hover:border-white transition-colors"
+                >
+                  Open Artifact
+                </button>
+              )}
             </motion.div>
           </div>
         </div>

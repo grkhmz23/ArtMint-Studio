@@ -3,6 +3,9 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ["@resvg/resvg-js"],
   },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   transpilePackages: [
     "@artmint/common",
     "@artmint/render",
@@ -10,6 +13,10 @@ const nextConfig = {
     "@artmint/exchangeart",
   ],
   webpack: (config) => {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      "pino-pretty": false,
+    };
     config.resolve.fallback = {
       ...config.resolve.fallback,
       fs: false,

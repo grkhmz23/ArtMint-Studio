@@ -17,6 +17,7 @@ const WalletMultiButton = dynamic(
 const navLinks = [
   { path: "/dashboard", label: "Index" },
   { path: "/studio", label: "AI Studio" },
+  { path: "/upload", label: "Upload" },
   { path: "/studio/manual", label: "Parameters" },
   { path: "/studio/code", label: "Terminal" },
 ];
