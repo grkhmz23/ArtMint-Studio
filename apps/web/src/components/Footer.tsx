@@ -7,7 +7,7 @@ export function Footer() {
   return (
     <footer className="border-t border-[var(--border)] bg-[var(--bg)]">
       <div className="max-w-[1600px] mx-auto w-full p-6 lg:p-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 lg:gap-12">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-8 lg:gap-12">
           {/* Brand */}
           <div className="space-y-4">
             <Link href="/" className="flex items-center gap-3 group no-underline">
@@ -103,6 +103,47 @@ export function Footer() {
                   className="font-mono text-sm text-[var(--text)] hover:text-[var(--accent)] transition-colors no-underline"
                 >
                   Upload
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Account */}
+          <div className="space-y-4">
+            <h3 className="font-mono text-xs uppercase tracking-widest text-[var(--text-dim)]">
+              Account
+            </h3>
+            <ul className="space-y-2">
+              <li>
+                <Link
+                  href="/dashboard"
+                  className="font-mono text-sm text-[var(--text)] hover:text-[var(--accent)] transition-colors no-underline"
+                >
+                  Dashboard
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/settings"
+                  className="font-mono text-sm text-[var(--text)] hover:text-[var(--accent)] transition-colors no-underline"
+                >
+                  Settings
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/notifications"
+                  className="font-mono text-sm text-[var(--text)] hover:text-[var(--accent)] transition-colors no-underline"
+                >
+                  Notifications
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/offers"
+                  className="font-mono text-sm text-[var(--text)] hover:text-[var(--accent)] transition-colors no-underline"
+                >
+                  Offers
                 </Link>
               </li>
             </ul>
