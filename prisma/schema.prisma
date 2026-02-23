@@ -34,8 +34,15 @@ model Mint {
   status        String   @default("pending") // pending, confirmed
   createdAt     DateTime @default(now())
   listing       Listing?
+  
+  // Relations
+  favorites     Favorite[]
+  activities    Activity[]
+  collectionItems CollectionItem[]
 
   @@index([wallet])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model Listing {
@@ -97,4 +104,80 @@ model RateLimitWindow {
   updatedAt   DateTime @updatedAt
 
   @@unique([key])
+}
+
+// ── Social Features ──────────────────────────────────────────────────────────
+
+model Favorite {
+  id          String   @id @default(cuid())
+  wallet      String
+  mintAddress String
+  createdAt   DateTime @default(now())
+
+  mint        Mint     @relation(fields: [mintAddress], references: [mintAddress], onDelete: Cascade)
+
+  @@unique([wallet, mintAddress])
+  @@index([wallet])
+  @@index([mintAddress])
+}
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerWallet  String
+  followingWallet String
+  createdAt   DateTime @default(now())
+
+  @@unique([followerWallet, followingWallet])
+  @@index([followerWallet])
+  @@index([followingWallet])
+}
+
+model Activity {
+  id          String   @id @default(cuid())
+  type        String   // "mint", "listing", "sale", "purchase", "favorite"
+  wallet      String   // Actor wallet
+  targetWallet String? // Target wallet (e.g., seller in purchase)
+  mintAddress String?
+  metadata    String?  // JSON blob with additional data
+  createdAt   DateTime @default(now())
+
+  mint        Mint?    @relation(fields: [mintAddress], references: [mintAddress], onDelete: SetNull)
+
+  @@index([wallet])
+  @@index([targetWallet])
+  @@index([type])
+  @@index([createdAt])
+}
+
+// ── Collections ───────────────────────────────────────────────────────────────
+
+model Collection {
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  name          String
+  description   String?
+  imageUrl      String?
+  creatorWallet String
+  featured      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  items         CollectionItem[]
+
+  @@index([creatorWallet])
+  @@index([featured])
+}
+
+model CollectionItem {
+  id           String   @id @default(cuid())
+  collectionId String
+  mintAddress  String
+  addedAt      DateTime @default(now())
+
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  mint         Mint       @relation(fields: [mintAddress], references: [mintAddress], onDelete: Cascade)
+
+  @@unique([collectionId, mintAddress])
+  @@index([collectionId])
+  @@index([mintAddress])
 }
