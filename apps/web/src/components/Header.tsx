@@ -2,17 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import dynamic from "next/dynamic";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { cn } from "@/lib/utils";
-
-const WalletMultiButton = dynamic(
-  () =>
-    import("@solana/wallet-adapter-react-ui").then(
-      (m) => m.WalletMultiButton
-    ),
-  { ssr: false }
-);
+import { WalletButton } from "./WalletButton";
 
 const navLinks = [
   { path: "/dashboard", label: "Index" },
@@ -77,7 +69,7 @@ export function Header() {
         </nav>
 
         {/* Wallet */}
-        <WalletMultiButton />
+        <WalletButton />
       </div>
     </header>
   );

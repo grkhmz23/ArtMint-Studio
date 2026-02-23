@@ -143,7 +143,63 @@ input[type=range]::-webkit-slider-runnable-track {
   color: black;
 }
 
-/* Wallet adapter overrides */
+/* Wallet adapter modal overrides */
+.wallet-adapter-modal {
+  background: rgba(3, 3, 3, 0.95) !important;
+  backdrop-filter: blur(10px);
+}
+
+.wallet-adapter-modal-wrapper {
+  background: var(--bg) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.wallet-adapter-modal-title {
+  font-family: 'Playfair Display', serif !important;
+  color: var(--text) !important;
+  text-transform: none !important;
+  font-weight: 400 !important;
+}
+
+.wallet-adapter-modal-list {
+  background: transparent !important;
+}
+
+.wallet-adapter-modal-list li {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 0 !important;
+  margin-bottom: 8px !important;
+}
+
+.wallet-adapter-modal-list li:hover {
+  background: var(--bg-hover) !important;
+  border-color: var(--accent) !important;
+}
+
+.wallet-adapter-modal-list .wallet-adapter-button {
+  font-family: 'Space Mono', monospace !important;
+  color: var(--text) !important;
+  text-transform: uppercase !important;
+  font-size: 11px !important;
+  letter-spacing: 0.1em !important;
+}
+
+.wallet-adapter-modal-list-more {
+  color: var(--text-dim) !important;
+  font-family: 'Space Mono', monospace !important;
+  font-size: 10px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.1em !important;
+}
+
+.wallet-adapter-modal-list-more:hover {
+  color: var(--accent) !important;
+}
+
+/* Override default wallet button (if used elsewhere) */
 .wallet-adapter-button {
   font-family: 'Space Mono', monospace !important;
 }
