@@ -149,11 +149,39 @@ export default function CodeStudioPage() {
       <Header />
       <div className="noise-overlay" />
 
+      {/* Info Banner */}
+      <div className="border-b border-[var(--border)] bg-[var(--bg-card)] px-6 py-3">
+        <div className="max-w-[1600px] mx-auto flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 bg-[var(--accent)]" />
+            <span className="font-mono text-[10px] text-[var(--accent)] uppercase tracking-widest">
+              Live Coding
+            </span>
+          </div>
+          <p className="font-mono text-[11px] text-[var(--text-dim)]">
+            Write code to generate art. See live preview. Mint as NFT.
+          </p>
+          <div className="hidden sm:flex items-center gap-4 ml-auto">
+            <span className="font-mono text-[10px] text-[var(--text-dim)] uppercase tracking-widest">
+              1. Code
+            </span>
+            <span className="text-[var(--border)]">→</span>
+            <span className="font-mono text-[10px] text-[var(--text-dim)] uppercase tracking-widest">
+              2. Preview
+            </span>
+            <span className="text-[var(--border)]">→</span>
+            <span className="font-mono text-[10px] text-[var(--text-dim)] uppercase tracking-widest">
+              3. Mint
+            </span>
+          </div>
+        </div>
+      </div>
+
       {/* Toolbar */}
       <div className="border-b border-[var(--border)] bg-[var(--bg)] flex items-center px-4 lg:px-6 justify-between shrink-0 z-10 py-2 gap-4 flex-wrap">
         <div className="flex items-center gap-4 lg:gap-6 flex-wrap">
           <div className="font-serif text-xl italic text-white pr-4 border-r border-[var(--border)] hidden sm:block">
-            Code Editor
+            Draw with Code
           </div>
 
           {/* Mode Toggle */}
