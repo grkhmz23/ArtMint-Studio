@@ -1,11 +1,12 @@
-import { Connection } from "@solana/web3.js";
+/**
+ * Solana Transaction Verification
+ * 
+ * Verifies transaction signatures on-chain with automatic RPC failover.
+ */
+
+import { getConnection } from "./rpc";
 
 const MAX_TX_AGE_SECONDS = 600; // 10 minutes
-
-function getConnection(): Connection {
-  const rpcUrl = process.env.SOLANA_RPC_URL ?? "https://api.devnet.solana.com";
-  return new Connection(rpcUrl, "confirmed");
-}
 
 export interface TxVerifyResult {
   valid: boolean;
@@ -20,6 +21,8 @@ export interface TxVerifyResult {
  * 4. Transaction references the expected mint address (if provided)
  *
  * ALWAYS fails closed on any error — never returns valid:true on failure.
+ * 
+ * Uses the global RPC manager for automatic failover.
  */
 export async function verifyTransaction(
   txSignature: string,
@@ -27,6 +30,7 @@ export async function verifyTransaction(
   expectedMintAddress?: string
 ): Promise<TxVerifyResult> {
   try {
+    // Use the RPC manager for automatic failover
     const connection = getConnection();
 
     // Fetch the transaction

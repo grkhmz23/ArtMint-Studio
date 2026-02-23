@@ -19,7 +19,7 @@ packages/render   → Deterministic SVG generator + PNG export (resvg)
 packages/ai       → AI client wrapper + Zod validation
 packages/exchangeart → Exchange Art IDL loaders + tx builders
 packages/common   → Schemas, stable stringify, hash utilities
-prisma/           → SQLite schema + migrations
+prisma/           → PostgreSQL schema + migrations
 ```
 
 ## Exchange Art Program IDs (from official IDLs)
@@ -61,11 +61,16 @@ Edit `.env` and set:
 AI_PROVIDER=anthropic          # or openai
 AI_API_KEY=your-api-key-here   # Your Anthropic or OpenAI API key
 AI_MODEL=claude-sonnet-4-20250514  # or gpt-4o, etc.
-SOLANA_CLUSTER=devnet
-SOLANA_RPC_URL=https://api.devnet.solana.com
-STORAGE_PROVIDER=local         # local for dev
-DATABASE_URL=file:./dev.db
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+SOLANA_CLUSTER=mainnet-beta
+SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+NEXT_PUBLIC_SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+STORAGE_PROVIDER=local         # use vercel-blob on Vercel
+DATABASE_URL=postgresql://user:password@host:5432/dbname
+SESSION_SECRET=<openssl rand -hex 32>
 ```
+
+For local testing on devnet, switch the three Solana variables back to devnet endpoints/cluster.
 
 ### Initialize Database
 
@@ -128,7 +133,7 @@ Use `/upload` to mint existing artwork while preserving provenance.
 4. **Generate**: Click "Generate 12 Variations" — show the grid loading
 5. **Browse**: Click through a few variations, showing the detail panel with params + palette
 6. **More like this**: Click "More like this" on a favorite to generate nearby variations
-7. **Connect wallet**: Click the wallet button, connect Phantom on devnet
+7. **Connect wallet**: Click the wallet button, connect Phantom on mainnet
 8. **Mint**: Select a variation, click "Mint this" — show the provenance data
 9. **Asset page** (`/asset/[mint]`):
    - Toggle PNG/Live Render views
@@ -150,6 +155,38 @@ Runs unit tests for:
 - Renderer determinism (same input → same SVG)
 - PRNG correctness
 - Exchange Art program ID verification
+
+## Mainnet Deployment
+
+⚠️ **Critical**: Before deploying to mainnet, review the deployment documentation:
+
+- 📖 [Mainnet Deployment Guide](docs/MAINNET_DEPLOYMENT.md)
+- ✅ [Production Checklist](docs/PRODUCTION_CHECKLIST.md)
+
+### Quick Deploy Checklist
+
+1. **Generate production secrets:**
+   ```bash
+   openssl rand -hex 32  # For SESSION_SECRET
+   ```
+
+2. **Configure RPC endpoints:**
+   - Get API key from [Helius](https://helius.xyz) or [QuickNode](https://quicknode.com)
+   - Set `SOLANA_RPC_URL` and `SOLANA_RPC_BACKUP_URL`
+
+3. **Set up storage:**
+   - Configure Vercel Blob: `STORAGE_PROVIDER=vercel-blob`
+   - Get token from Vercel dashboard
+
+4. **Run database migrations:**
+   ```bash
+   pnpm db:migrate
+   ```
+
+5. **Verify deployment:**
+   ```bash
+   curl https://your-domain.com/api/health
+   ```
 
 ## Scripts
 

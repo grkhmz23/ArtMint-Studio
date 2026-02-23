@@ -16,6 +16,7 @@ import {
 import { BN, Program } from "@coral-xyz/anchor";
 import { PROGRAM_IDS, CODE_CANVAS_FEE_RECIPIENT, CODE_CANVAS_UPDATE_AUTH } from "./constants";
 import { loadCodeCanvasIdl } from "./idl";
+import { addPriorityFees, FeePresets } from "./fees";
 
 /**
  * For the MVP, we build a simplified mint transaction.
@@ -156,6 +157,9 @@ export async function buildMintNftTransaction(
 
   const { blockhash } = await connection.getLatestBlockhash();
   transaction.recentBlockhash = blockhash;
+
+  // Add priority fees for reliable mainnet processing
+  await addPriorityFees(transaction, FeePresets.mint, connection);
 
   return {
     transaction,

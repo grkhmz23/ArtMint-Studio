@@ -10,7 +10,11 @@ import { PhantomWalletAdapter, SolflareWalletAdapter } from "@solana/wallet-adap
 import "@solana/wallet-adapter-react-ui/styles.css";
 
 export function Providers({ children }: { children: ReactNode }) {
-  const endpoint = process.env.NEXT_PUBLIC_SOLANA_RPC_URL ?? "https://api.devnet.solana.com";
+  // Production fallback points to mainnet to avoid accidental devnet deployments.
+  const endpoint = process.env.NEXT_PUBLIC_SOLANA_RPC_URL
+    ?? (process.env.NODE_ENV === "production"
+      ? "https://api.mainnet-beta.solana.com"
+      : "https://api.devnet.solana.com");
 
   const wallets = useMemo(
     () => [new PhantomWalletAdapter(), new SolflareWalletAdapter()],

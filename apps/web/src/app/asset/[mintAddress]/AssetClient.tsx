@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { Connection, Keypair, Transaction } from "@solana/web3.js";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,11 +35,31 @@ interface MintData {
   } | null;
 }
 
+interface PreparedListing {
+  serializedTransaction: string;
+  saleStatePublicKey: string;
+  saleStateSecretKey: string;
+  blockhash: string;
+  lastValidBlockHeight: number;
+  estimatedFee: number;
+  expiresAt: string;
+}
+
+type ListingStep = 
+  | "idle"
+  | "preparing"
+  | "signing"
+  | "submitting"
+  | "confirming"
+  | "success";
+
 export function AssetClient({ mint }: { mint: MintData }) {
-  const { publicKey } = useWallet();
+  const { publicKey, signTransaction } = useWallet();
   const [listPrice, setListPrice] = useState("");
-  const [listing, setListing] = useState(false);
+  const [listingStep, setListingStep] = useState<ListingStep>("idle");
   const [listError, setListError] = useState<string | null>(null);
+  const [preparedListing, setPreparedListing] = useState<PreparedListing | null>(null);
+  const [txSignature, setTxSignature] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [showLive, setShowLive] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -122,36 +143,158 @@ export function AssetClient({ mint }: { mint: MintData }) {
     window.open(mint.animationUrl, "_blank");
   };
 
+  /**
+   * New 3-step listing flow:
+   * 1. Prepare: Call API to get unsigned transaction
+   * 2. Sign: Sign with wallet + saleStateKeypair, submit to chain
+   * 3. Confirm: Call API to update database
+   */
   const handleListBuyNow = async () => {
-    if (!publicKey || !listPrice) return;
+    if (!publicKey || !signTransaction || !listPrice) return;
+    
     const priceLamports = Math.floor(parseFloat(listPrice) * 1e9);
     if (isNaN(priceLamports) || priceLamports <= 0) {
       setListError("Enter a valid price in SOL");
       return;
     }
-    setListing(true);
+
     setListError(null);
+    
     try {
-      const res = await fetch("/api/listing", {
+      // Step 1: Prepare the listing transaction
+      setListingStep("preparing");
+      const prepareRes = await fetch("/api/listing/prepare", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           mintAddress: mint.mintAddress,
           priceLamports: priceLamports.toString(),
-          status: "active",
         }),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error ?? "Listing failed");
+
+      if (!prepareRes.ok) {
+        const err = await prepareRes.json();
+        throw new Error(err.error ?? "Failed to prepare listing");
       }
-      window.location.reload();
+
+      const prepareData = await prepareRes.json();
+      const prepared: PreparedListing = prepareData.prepared;
+      setPreparedListing(prepared);
+
+      // Step 2: Sign the transaction
+      setListingStep("signing");
+      
+      // Deserialize the transaction
+      const transactionBuffer = Buffer.from(prepared.serializedTransaction, "base64");
+      const transaction = Transaction.from(transactionBuffer);
+
+      // Sign with the user's wallet
+      const signedTx = await signTransaction(transaction);
+      
+      // Step 3: Submit to blockchain
+      setListingStep("submitting");
+      
+      const cluster = (process.env.NEXT_PUBLIC_SOLANA_CLUSTER ?? "devnet").toLowerCase();
+      const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL ?? (
+        cluster === "mainnet-beta" || cluster === "mainnet"
+          ? "https://api.mainnet-beta.solana.com"
+          : "https://api.devnet.solana.com"
+      );
+      
+      const connection = new Connection(rpcUrl, "confirmed");
+      
+      // Send the signed transaction
+      const signature = await connection.sendRawTransaction(signedTx.serialize(), {
+        skipPreflight: false,
+        preflightCommitment: "confirmed",
+      });
+      
+      setTxSignature(signature);
+
+      // Step 4: Wait for confirmation
+      setListingStep("confirming");
+      
+      // Poll for confirmation (max 60 seconds)
+      const confirmed = await Promise.race([
+        connection.confirmTransaction(
+          {
+            signature,
+            blockhash: prepared.blockhash,
+            lastValidBlockHeight: prepared.lastValidBlockHeight,
+          },
+          "confirmed"
+        ),
+        new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error("Confirmation timeout")), 60000)
+        ),
+      ]);
+
+      if (confirmed.value.err) {
+        throw new Error("Transaction failed on-chain");
+      }
+
+      // Step 5: Confirm with backend
+      const confirmRes = await fetch("/api/listing/confirm", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          mintAddress: mint.mintAddress,
+          txSignature: signature,
+          saleStateKey: prepared.saleStatePublicKey,
+        }),
+      });
+
+      if (!confirmRes.ok) {
+        const err = await confirmRes.json();
+        // If it's a 202 (Accepted), the tx is still processing
+        if (confirmRes.status === 202) {
+          setListingStep("success");
+          // Reload after a delay to show the listing
+          setTimeout(() => window.location.reload(), 3000);
+          return;
+        }
+        throw new Error(err.error ?? "Failed to confirm listing");
+      }
+
+      setListingStep("success");
+      
+      // Reload to show updated state
+      setTimeout(() => window.location.reload(), 2000);
+      
     } catch (err) {
+      console.error("Listing error:", err);
       setListError(err instanceof Error ? err.message : "Listing failed");
-    } finally {
-      setListing(false);
+      setListingStep("idle");
     }
   };
+
+  const getExplorerUrl = (signature: string) => {
+    const cluster = (process.env.NEXT_PUBLIC_SOLANA_CLUSTER ?? "devnet").toLowerCase();
+    const clusterParam = cluster === "mainnet-beta" || cluster === "mainnet" 
+      ? "" 
+      : `?cluster=${cluster}`;
+    return `https://explorer.solana.com/tx/${signature}${clusterParam}`;
+  };
+
+  const getListingStatusMessage = () => {
+    switch (listingStep) {
+      case "preparing":
+        return "Preparing transaction...";
+      case "signing":
+        return "Sign in your wallet...";
+      case "submitting":
+        return "Submitting to blockchain...";
+      case "confirming":
+        return "Waiting for confirmation...";
+      case "success":
+        return "Listed successfully!";
+      default:
+        return "List Asset";
+    }
+  };
+
+  const isListingInProgress = listingStep !== "idle" && listingStep !== "success";
+  const isListed = mint.listing?.status === "active";
 
   const provenanceRows = isUpload
     ? [
@@ -370,19 +513,24 @@ export function AssetClient({ mint }: { mint: MintData }) {
 
             {/* Listing */}
             <motion.div initial="hidden" animate="show" variants={fadeUp} className="space-y-4 pt-4">
-              {mint.listing ? (
+              {isListed ? (
                 <div className="border border-[var(--success)] p-6 bg-[var(--success)]/5">
                   <div className="font-mono text-[10px] text-[var(--success)] uppercase tracking-widest mb-2 flex items-center gap-2">
                     <div className="w-1.5 h-1.5 bg-[var(--success)] rounded-full" />
-                    {mint.listing.status}
+                    {mint.listing!.status}
                   </div>
                   <div className="font-serif text-4xl text-white mb-6">
-                    {(Number(mint.listing.priceLamports) / 1e9).toFixed(2)} SOL
+                    {(Number(mint.listing!.priceLamports) / 1e9).toFixed(2)} SOL
                   </div>
-                  {mint.listing.txSignature && (
-                    <div className="font-mono text-[10px] text-[var(--text-dim)] mb-4">
-                      TX: {mint.listing.txSignature}
-                    </div>
+                  {mint.listing!.txSignature && (
+                    <a
+                      href={getExplorerUrl(mint.listing!.txSignature)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-mono text-[10px] text-[var(--accent)] hover:underline block mb-2"
+                    >
+                      View on Explorer →
+                    </a>
                   )}
                 </div>
               ) : (
@@ -398,6 +546,7 @@ export function AssetClient({ mint }: { mint: MintData }) {
                       placeholder="0.00"
                       value={listPrice}
                       onChange={(e) => setListPrice(e.target.value)}
+                      disabled={isListingInProgress}
                       className="text-xl text-center"
                     />
                     <div className="border border-[var(--border)] flex items-center px-4 font-mono text-xs uppercase tracking-widest shrink-0">
@@ -408,10 +557,64 @@ export function AssetClient({ mint }: { mint: MintData }) {
                     variant="outline"
                     className="w-full"
                     onClick={handleListBuyNow}
-                    disabled={listing || !publicKey || !listPrice}
+                    disabled={isListingInProgress || !publicKey || !listPrice || listingStep === "success"}
                   >
-                    {listing ? "Listing..." : "List Asset"}
+                    {getListingStatusMessage()}
                   </Button>
+                  
+                  {/* Transaction progress indicator */}
+                  {isListingInProgress && (
+                    <div className="mt-4 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className={cn(
+                          "w-2 h-2 rounded-full",
+                          listingStep === "preparing" ? "bg-[var(--accent)] animate-pulse" : "bg-[var(--success)]"
+                        )} />
+                        <span className="font-mono text-[10px] text-[var(--text-dim)]">Prepare transaction</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className={cn(
+                          "w-2 h-2 rounded-full",
+                          listingStep === "signing" ? "bg-[var(--accent)] animate-pulse" :
+                          listingStep === "preparing" ? "bg-[var(--border)]" : "bg-[var(--success)]"
+                        )} />
+                        <span className="font-mono text-[10px] text-[var(--text-dim)]">Sign with wallet</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className={cn(
+                          "w-2 h-2 rounded-full",
+                          listingStep === "submitting" ? "bg-[var(--accent)] animate-pulse" :
+                          ["preparing", "signing"].includes(listingStep) ? "bg-[var(--border)]" : "bg-[var(--success)]"
+                        )} />
+                        <span className="font-mono text-[10px] text-[var(--text-dim)]">Submit to blockchain</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className={cn(
+                          "w-2 h-2 rounded-full",
+                          listingStep === "confirming" ? "bg-[var(--accent)] animate-pulse" : "bg-[var(--border)]"
+                        )} />
+                        <span className="font-mono text-[10px] text-[var(--text-dim)]">Confirm listing</span>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Success message with explorer link */}
+                  {listingStep === "success" && txSignature && (
+                    <div className="mt-4 p-3 border border-[var(--success)] bg-[var(--success)]/5">
+                      <p className="font-mono text-[10px] text-[var(--success)] mb-2">
+                        ✓ Listed successfully!
+                      </p>
+                      <a
+                        href={getExplorerUrl(txSignature)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono text-[10px] text-[var(--accent)] hover:underline"
+                      >
+                        View transaction on Explorer →
+                      </a>
+                    </div>
+                  )}
+                  
                   {listError && (
                     <div className="font-mono text-[10px] text-[var(--danger)] mt-2">
                       {listError}

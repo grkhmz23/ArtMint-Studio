@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 
+function getUrlOrigin(value: string | undefined): string | null {
+  if (!value) return null;
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Next.js middleware for security headers and CORS.
  */
@@ -44,6 +53,17 @@ export function middleware(req: NextRequest) {
   // wallet adapter scripts, and self for everything else.
   // Note: the render API sets its own restrictive CSP on SVG responses.
   if (!req.nextUrl.pathname.startsWith("/api/")) {
+    const connectSrc = new Set([
+      "'self'",
+      "https://api.devnet.solana.com",
+      "https://api.mainnet-beta.solana.com",
+      "https://*.helius-rpc.com",
+      "https://cdn.jsdelivr.net",
+      "wss:",
+    ]);
+    const publicRpcOrigin = getUrlOrigin(process.env.NEXT_PUBLIC_SOLANA_RPC_URL);
+    if (publicRpcOrigin) connectSrc.add(publicRpcOrigin);
+
     res.headers.set(
       "Content-Security-Policy",
       [
@@ -52,7 +72,7 @@ export function middleware(req: NextRequest) {
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
         "font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net",
         "img-src 'self' data: blob: http://localhost:* https:",
-        "connect-src 'self' https://api.devnet.solana.com https://api.mainnet-beta.solana.com https://*.helius-rpc.com https://cdn.jsdelivr.net wss:",
+        `connect-src ${Array.from(connectSrc).join(" ")}`,
         "worker-src 'self' blob:",
         "frame-src 'self' blob:",
         "frame-ancestors 'none'",

@@ -28,7 +28,7 @@
 
 ### Scene 4: Connect Wallet + Mint (40s)
 - Click wallet button (top right)
-- Connect Phantom on devnet
+- Connect Phantom on mainnet
 - Select a favorite variation
 - Click "Mint this"
 - Show the mint preparation (asset upload)
@@ -54,7 +54,7 @@
 - End
 
 ## Tips
-- Use devnet with a funded wallet (airdrop SOL first: `solana airdrop 2`)
+- Use a funded mainnet wallet (no airdrops on mainnet)
 - Have the AI API key configured before recording
 - Use a clean browser profile for a fresh wallet state
 - Record at 1080p or higher

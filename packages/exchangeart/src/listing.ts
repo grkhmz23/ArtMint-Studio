@@ -12,8 +12,8 @@ import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
-import { BN } from "@coral-xyz/anchor";
 import { PROGRAM_IDS } from "./constants";
+import { addPriorityFees, FeePresets } from "./fees";
 
 /**
  * Build a Buy Now listing transaction using the Exchange Art Buy Now + Editions IDL.
@@ -30,6 +30,21 @@ export interface CreateBuyNowParams {
 export interface CreateBuyNowResult {
   transaction: Transaction;
   saleStateKeypair: Keypair;
+}
+
+export interface PreparedListingTransaction {
+  /** Serialized transaction (base64) - ready for partial signing */
+  serializedTransaction: string;
+  /** Sale state account public key */
+  saleStatePublicKey: string;
+  /** Sale state account secret key (base64) - client must sign with this */
+  saleStateSecretKey: string;
+  /** Blockhash used in transaction (for expiry checking) */
+  blockhash: string;
+  /** Block height at which transaction was prepared */
+  lastValidBlockHeight: number;
+  /** Estimated fee in lamports */
+  estimatedFee: number;
 }
 
 export async function buildCreateBuyNowTransaction(
@@ -119,11 +134,66 @@ export async function buildCreateBuyNowTransaction(
   const transaction = new Transaction().add(ix);
   transaction.feePayer = seller;
 
-  const { blockhash } = await connection.getLatestBlockhash();
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
   transaction.recentBlockhash = blockhash;
+
+  // Add priority fees for reliable mainnet processing
+  await addPriorityFees(transaction, FeePresets.listing, connection);
 
   return {
     transaction,
     saleStateKeypair,
+  };
+}
+
+/**
+ * Prepare a listing transaction for client-side signing.
+ * 
+ * This function builds the transaction and serializes it along with the
+ * sale state keypair data that the client needs to sign.
+ * 
+ * @param params - Parameters for creating the listing
+ * @returns Prepared transaction ready for client signing
+ */
+export async function prepareListingTransaction(
+  params: CreateBuyNowParams
+): Promise<PreparedListingTransaction> {
+  const { connection } = params;
+
+  // Build the transaction
+  const { transaction, saleStateKeypair } = await buildCreateBuyNowTransaction(params);
+
+  // Get fresh blockhash info
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+  
+  // Update blockhash
+  transaction.recentBlockhash = blockhash;
+
+  // Get fee estimate
+  let estimatedFee = 5000; // Default fallback
+  try {
+    const fee = await connection.getFeeForMessage(transaction.compileMessage());
+    if (fee.value !== null) {
+      estimatedFee = fee.value;
+    }
+  } catch {
+    // Use default if fee estimation fails
+  }
+
+  // Partially sign with the sale state keypair
+  transaction.partialSign(saleStateKeypair);
+
+  // Serialize the transaction
+  const serializedTransaction = Buffer.from(
+    transaction.serialize({ requireAllSignatures: false })
+  ).toString("base64");
+
+  return {
+    serializedTransaction,
+    saleStatePublicKey: saleStateKeypair.publicKey.toBase58(),
+    saleStateSecretKey: Buffer.from(saleStateKeypair.secretKey).toString("base64"),
+    blockhash,
+    lastValidBlockHeight,
+    estimatedFee,
   };
 }
