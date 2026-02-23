@@ -266,3 +266,23 @@ model Notification {
   @@index([type])
   @@index([createdAt])
 }
+
+// ── User Profiles ─────────────────────────────────────────────────────────────
+
+model UserProfile {
+  id          String   @id @default(cuid())
+  wallet      String   @unique
+  username    String?  @unique
+  displayName String?
+  bio         String?
+  avatarUrl   String?
+  website     String?
+  twitter     String?  // Twitter/X handle without @
+  discord     String?
+  verified    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([username])
+  @@index([verified])
+}

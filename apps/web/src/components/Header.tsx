@@ -6,6 +6,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { cn } from "@/lib/utils";
 import { WalletButton } from "./WalletButton";
 import { NotificationBell } from "./NotificationBell";
+import { UserProfileDropdown } from "./UserProfileDropdown";
 
 const navLinks = [
   { path: "/dashboard", label: "Index" },
@@ -59,25 +60,16 @@ export function Header() {
               {link.label}
             </Link>
           ))}
-          {publicKey && (
-            <Link
-              href={`/profile/${publicKey.toBase58()}`}
-              className={cn(
-                "relative py-2 transition-colors hover:text-[var(--accent)] no-underline",
-                pathname.startsWith("/profile/")
-                  ? "text-[var(--accent)] after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-px after:bg-[var(--accent)]"
-                  : "text-[var(--text-dim)]"
-              )}
-            >
-              Archive
-            </Link>
-          )}
         </nav>
 
-        {/* Notifications & Wallet */}
+        {/* Right Side: Notifications, User Profile, Wallet */}
         <div className="flex items-center gap-2">
           <NotificationBell />
-          <WalletButton />
+          {publicKey ? (
+            <UserProfileDropdown />
+          ) : (
+            <WalletButton />
+          )}
         </div>
       </div>
     </header>

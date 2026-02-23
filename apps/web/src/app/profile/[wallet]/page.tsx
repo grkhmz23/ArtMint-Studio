@@ -6,7 +6,7 @@ interface PageProps {
 }
 
 export default async function ProfilePage({ params }: PageProps) {
-  const [mints, followerCount, followingCount] = await Promise.all([
+  const [mints, followerCount, followingCount, profile] = await Promise.all([
     prisma.mint.findMany({
       where: { wallet: params.wallet },
       include: { listing: true },
@@ -17,6 +17,9 @@ export default async function ProfilePage({ params }: PageProps) {
     }),
     prisma.follow.count({
       where: { followerWallet: params.wallet },
+    }),
+    prisma.userProfile.findUnique({
+      where: { wallet: params.wallet },
     }),
   ]);
 
@@ -36,6 +39,7 @@ export default async function ProfilePage({ params }: PageProps) {
       mints={serialized}
       followerCount={followerCount}
       followingCount={followingCount}
+      profile={profile}
     />
   );
 }
