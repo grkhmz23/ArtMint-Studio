@@ -98,6 +98,15 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // Log activity
+    await prisma.activity.create({
+      data: {
+        type: "mint",
+        wallet,
+        mintAddress,
+      },
+    });
+
     return NextResponse.json({ success: true, mintAddress });
   } catch (err) {
     console.error("Mint confirm error:", err instanceof Error ? err.message : err);

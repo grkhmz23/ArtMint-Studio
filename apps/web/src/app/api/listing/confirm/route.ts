@@ -164,6 +164,18 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // Log activity
+    await prisma.activity.create({
+      data: {
+        type: "listing",
+        wallet,
+        mintAddress,
+        metadata: JSON.stringify({
+          priceLamports: updatedListing.priceLamports.toString(),
+        }),
+      },
+    });
+
     return NextResponse.json({
       success: true,
       listing: {
