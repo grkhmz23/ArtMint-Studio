@@ -12,7 +12,7 @@ import { presets } from "@artmint/common";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { fadeUp, staggerContainer } from "@/lib/animations";
-import { X } from "lucide-react";
+import { X, Layers, CheckSquare, Square } from "lucide-react";
 
 export default function StudioPage() {
   const { publicKey, signMessage } = useWallet();
@@ -29,6 +29,12 @@ export default function StudioPage() {
   const [signingIn, setSigningIn] = useState(false);
   const [quotaRemaining, setQuotaRemaining] = useState<number | null>(null);
   const [quotaLimit, setQuotaLimit] = useState<number>(0);
+
+  // Batch minting state
+  const [batchMode, setBatchMode] = useState(false);
+  const [selectedBatch, setSelectedBatch] = useState<Set<number>>(new Set());
+  const [batchMinting, setBatchMinting] = useState(false);
+  const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
 
   useEffect(() => {
     checkSession();
@@ -107,6 +113,7 @@ export default function StudioPage() {
       setLoading(true);
       setError(null);
       setSelectedIndex(null);
+      setSelectedBatch(new Set());
       try {
         const res = await fetch("/api/ai/variations", {
           method: "POST",
@@ -149,6 +156,84 @@ export default function StudioPage() {
     },
     [generateVariations]
   );
+
+  // Batch selection toggle
+  const toggleBatchSelection = (index: number) => {
+    const newSet = new Set(selectedBatch);
+    if (newSet.has(index)) {
+      newSet.delete(index);
+    } else {
+      newSet.add(index);
+    }
+    setSelectedBatch(newSet);
+  };
+
+  // Select/deselect all
+  const toggleSelectAll = () => {
+    if (selectedBatch.size === variations.length) {
+      setSelectedBatch(new Set());
+    } else {
+      setSelectedBatch(new Set(variations.map((_, i) => i)));
+    }
+  };
+
+  // Batch mint
+  const handleBatchMint = async () => {
+    if (!publicKey || selectedBatch.size === 0) return;
+
+    setBatchMinting(true);
+    setBatchProgress({ current: 0, total: selectedBatch.size });
+
+    const indices = Array.from(selectedBatch);
+    const results = [];
+
+    for (let i = 0; i < indices.length; i++) {
+      const idx = indices[i];
+      const variation = variations[idx];
+      
+      try {
+        // First prepare the mint
+        const prepareRes = await fetch("/api/mint", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            templateId: variation.templateId,
+            seed: variation.seed,
+            palette: variation.palette,
+            params: variation.params,
+            prompt,
+            title: variation.title || `${variation.templateId} #${variation.seed}`,
+          }),
+        });
+
+        if (!prepareRes.ok) {
+          results.push({ index: idx, success: false, error: "Prepare failed" });
+          setBatchProgress({ current: i + 1, total: indices.length });
+          continue;
+        }
+
+        const prepareData = await prepareRes.json();
+        results.push({ index: idx, success: true, data: prepareData });
+        setBatchProgress({ current: i + 1, total: indices.length });
+      } catch (err) {
+        results.push({ index: idx, success: false, error: String(err) });
+        setBatchProgress({ current: i + 1, total: indices.length });
+      }
+    }
+
+    setBatchMinting(false);
+    
+    // Show results
+    const successCount = results.filter((r) => r.success).length;
+    if (successCount > 0) {
+      setError(null);
+      alert(`Batch mint prepared: ${successCount}/${selectedBatch.size} artworks ready for on-chain confirmation.\n\nGo to your profile to complete the minting process.`);
+      setSelectedBatch(new Set());
+      setBatchMode(false);
+    } else {
+      setError("Batch mint failed. Please try again.");
+    }
+  };
 
   const selected =
     selectedIndex !== null ? variations[selectedIndex] ?? null : null;
@@ -248,6 +333,69 @@ export default function StudioPage() {
               </Button>
             </div>
           </div>
+
+          {/* Batch Mint Controls */}
+          {variations.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-[var(--border)] flex items-center justify-between flex-wrap gap-4">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => {
+                    setBatchMode(!batchMode);
+                    if (batchMode) setSelectedBatch(new Set());
+                  }}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest transition-colors",
+                    batchMode
+                      ? "bg-[var(--accent)] text-black"
+                      : "text-[var(--text-dim)] hover:text-white border border-[var(--border)]"
+                  )}
+                >
+                  <Layers size={12} />
+                  Batch Mint
+                </button>
+
+                {batchMode && (
+                  <>
+                    <button
+                      onClick={toggleSelectAll}
+                      className="flex items-center gap-2 px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest text-[var(--text-dim)] hover:text-white border border-[var(--border)]"
+                    >
+                      {selectedBatch.size === variations.length ? (
+                        <CheckSquare size={12} />
+                      ) : (
+                        <Square size={12} />
+                      )}
+                      {selectedBatch.size === variations.length ? "Deselect All" : "Select All"}
+                    </button>
+
+                    <span className="font-mono text-[10px] text-[var(--text-dim)]">
+                      {selectedBatch.size} selected
+                    </span>
+                  </>
+                )}
+              </div>
+
+              {batchMode && selectedBatch.size > 0 && (
+                <Button
+                  onClick={handleBatchMint}
+                  disabled={batchMinting}
+                  className="gap-2"
+                >
+                  {batchMinting ? (
+                    <>
+                      <span className="animate-spin">⟳</span>
+                      Preparing {batchProgress.current}/{batchProgress.total}...
+                    </>
+                  ) : (
+                    <>
+                      <Layers size={14} />
+                      Mint {selectedBatch.size} Selected
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -285,7 +433,10 @@ export default function StudioPage() {
               <VariationGrid
                 variations={variations}
                 selectedIndex={selectedIndex}
-                onSelect={setSelectedIndex}
+                onSelect={batchMode ? undefined : setSelectedIndex}
+                batchMode={batchMode}
+                selectedBatch={selectedBatch}
+                onToggleBatch={toggleBatchSelection}
               />
             )}
           </div>
@@ -293,7 +444,7 @@ export default function StudioPage() {
 
         {/* Detail Panel */}
         <AnimatePresence>
-          {selected && (
+          {selected && !batchMode && (
             <DetailPanel
               variation={selected}
               prompt={prompt}
