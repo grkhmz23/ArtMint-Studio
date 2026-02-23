@@ -11,6 +11,8 @@ import { fadeUp } from "@/lib/animations";
 import type { CanonicalInput } from "@artmint/common";
 import type { UploadProvenance } from "@/lib/upload-metadata";
 import { cn } from "@/lib/utils";
+import { FullscreenPreview, FullscreenButton } from "@/components/FullscreenPreview";
+import { FavoriteButton } from "@/components/FavoriteButton";
 
 interface MintData {
   id: string;
@@ -63,6 +65,7 @@ export function AssetClient({ mint }: { mint: MintData }) {
   const [copied, setCopied] = useState(false);
   const [showLive, setShowLive] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [fullscreenOpen, setFullscreenOpen] = useState(false);
 
   const parsedInput = useMemo(() => {
     try {
@@ -367,6 +370,15 @@ export function AssetClient({ mint }: { mint: MintData }) {
                   className="w-full h-full object-cover shadow-2xl"
                 />
               )}
+              {/* Overlay Controls */}
+              <div className="absolute top-4 right-4 flex items-center gap-2">
+                <FavoriteButton 
+                  mintAddress={mint.mintAddress}
+                  size="md"
+                />
+                <FullscreenButton onClick={() => setFullscreenOpen(true)} />
+              </div>
+
               <div className="absolute bottom-4 left-6 right-6 flex justify-between items-end">
                 <span className="font-serif text-2xl italic text-white/50">
                   {mint.title ?? (isUpload ? "ArtMint Upload" : `ArtMint #${canonicalInput?.seed ?? ""}`)}
@@ -376,6 +388,14 @@ export function AssetClient({ mint }: { mint: MintData }) {
                 </span>
               </div>
             </motion.div>
+
+            {/* Fullscreen Preview */}
+            <FullscreenPreview
+              imageUrl={mint.imageUrl}
+              title={mint.title ?? undefined}
+              isOpen={fullscreenOpen}
+              onClose={() => setFullscreenOpen(false)}
+            />
           </div>
 
           {/* Info & Actions */}
