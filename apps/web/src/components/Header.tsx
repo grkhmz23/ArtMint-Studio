@@ -9,7 +9,7 @@ import { WalletButton } from "./WalletButton";
 const navLinks = [
   { path: "/dashboard", label: "Index" },
   { path: "/studio", label: "AI Studio" },
-  { path: "/upload", label: "Upload" },
+  { path: "/upload", label: "Submit" },
   { path: "/studio/manual", label: "Parameters" },
   { path: "/studio/code", label: "Terminal" },
 ];

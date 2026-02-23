@@ -209,7 +209,7 @@ export default function UploadPage() {
           <div className="flex-1 space-y-6">
             <div className="border border-[var(--border)] p-6">
               <div className="font-mono text-[10px] uppercase tracking-widest text-[var(--text-dim)] mb-3">
-                Upload Artwork
+                Submit Your Art
               </div>
               <UploadDropzone file={file} onFile={setFile} disabled={processing || uploading} />
             </div>
@@ -243,7 +243,7 @@ export default function UploadPage() {
                   </div>
                 </div>
                 <div className="text-[10px] text-[var(--text-dim)] font-mono uppercase tracking-widest">
-                  We keep your original file for provenance + download.
+                  Original preserved for provenance. Converted to NFT-friendly format for minting.
                 </div>
               </div>
             )}
@@ -252,7 +252,7 @@ export default function UploadPage() {
           <div className="w-full lg:w-[420px] shrink-0 space-y-6">
             <div className="border border-[var(--border)] p-6 space-y-6">
               <div className="font-mono text-[10px] uppercase tracking-widest text-[var(--text-dim)]">
-                Optimization Settings
+                Mint Format
               </div>
               <OptimizationSettings
                 mintMaxSide={mintMaxSide}
@@ -267,13 +267,13 @@ export default function UploadPage() {
                 }}
               />
               <div className="text-[10px] text-[var(--text-dim)] font-mono uppercase tracking-widest">
-                Outputs are re-encoded to strip metadata. Originals are preserved.
+                Re-encoded for optimal marketplace display. No filters or edits applied.
               </div>
             </div>
 
             <div className="border border-[var(--border)] p-6 space-y-4">
               <div className="font-mono text-[10px] uppercase tracking-widest text-[var(--text-dim)]">
-                Metadata
+                Artwork Details
               </div>
               <Input
                 placeholder="Title (optional)"

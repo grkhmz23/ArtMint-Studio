@@ -51,10 +51,10 @@ export function UploadDropzone({ file, onFile, disabled }: UploadDropzoneProps) 
       />
       <label htmlFor="upload-input" className="cursor-pointer">
         <div className="font-mono text-xs uppercase tracking-widest text-[var(--text-dim)]">
-          Drag & drop or click to upload
+          Drag & drop or click to select
         </div>
         <div className="mt-2 font-serif text-2xl text-white">
-          {file ? file.name : "Select an image file"}
+          {file ? file.name : "Your artwork file"}
         </div>
         <div className="mt-3 text-[11px] text-[var(--text-dim)] font-mono uppercase tracking-widest">
           PNG, JPG, WEBP (GIF optional) · max 25MB · no SVG
