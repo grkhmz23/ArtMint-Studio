@@ -10,6 +10,7 @@ const navLinks = [
   { path: "/dashboard", label: "Index" },
   { path: "/explore", label: "Explore" },
   { path: "/collections", label: "Collections" },
+  { path: "/offers", label: "Offers" },
   { path: "/activity", label: "Activity" },
   { path: "/studio", label: "AI Studio" },
   { path: "/studio/code", label: "Terminal" },

@@ -13,6 +13,7 @@ import type { UploadProvenance } from "@/lib/upload-metadata";
 import { cn } from "@/lib/utils";
 import { FullscreenPreview, FullscreenButton } from "@/components/FullscreenPreview";
 import { FavoriteButton } from "@/components/FavoriteButton";
+import { MakeOfferButton } from "@/components/MakeOfferButton";
 
 interface MintData {
   id: string;
@@ -619,6 +620,16 @@ export function AssetClient({ mint }: { mint: MintData }) {
                   )}
                   
                   {/* Success message with explorer link */}
+                  {/* Make Offer Button - only show if not listed and not owner */}
+                  {!isListed && publicKey?.toBase58() !== mint.wallet && (
+                    <div className="mt-4 pt-4 border-t border-[var(--border)]">
+                      <MakeOfferButton
+                        mintAddress={mint.mintAddress}
+                        sellerWallet={mint.wallet}
+                      />
+                    </div>
+                  )}
+
                   {listingStep === "success" && txSignature && (
                     <div className="mt-4 p-3 border border-[var(--success)] bg-[var(--success)]/5">
                       <p className="font-mono text-[10px] text-[var(--success)] mb-2">

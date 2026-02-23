@@ -39,6 +39,8 @@ model Mint {
   favorites     Favorite[]
   activities    Activity[]
   collectionItems CollectionItem[]
+  offers        Offer[]
+  auction       Auction?
 
   @@index([wallet])
   @@index([status])
@@ -180,4 +182,65 @@ model CollectionItem {
   @@unique([collectionId, mintAddress])
   @@index([collectionId])
   @@index([mintAddress])
+}
+
+// ── Offers & Auctions ─────────────────────────────────────────────────────────
+
+model Offer {
+  id            String   @id @default(cuid())
+  mintAddress   String
+  buyerWallet   String
+  sellerWallet  String
+  priceLamports BigInt
+  status        String   @default("active") // active, accepted, rejected, expired, cancelled
+  expiresAt     DateTime
+  txSignature   String?  // Set when offer is accepted and transaction completed
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  mint          Mint     @relation(fields: [mintAddress], references: [mintAddress], onDelete: Cascade)
+
+  @@index([buyerWallet])
+  @@index([sellerWallet])
+  @@index([mintAddress])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model Auction {
+  id              String   @id @default(cuid())
+  mintAddress     String   @unique
+  sellerWallet    String
+  startPriceLamports BigInt
+  reservePriceLamports BigInt?
+  minBidIncrement BigInt   @default(50000000) // 0.05 SOL default
+  type            String   // "english" | "dutch"
+  startTime       DateTime
+  endTime         DateTime
+  status          String   @default("active") // active, ended, cancelled
+  highestBid      BigInt?
+  highestBidder   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  mint            Mint     @relation(fields: [mintAddress], references: [mintAddress], onDelete: Cascade)
+  bids            Bid[]
+
+  @@index([sellerWallet])
+  @@index([status])
+  @@index([endTime])
+}
+
+model Bid {
+  id          String   @id @default(cuid())
+  auctionId   String
+  bidder      String
+  amount      BigInt
+  createdAt   DateTime @default(now())
+
+  auction     Auction  @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+
+  @@index([auctionId])
+  @@index([bidder])
+  @@index([createdAt])
 }
