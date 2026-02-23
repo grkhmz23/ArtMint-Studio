@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { notifyFavorite } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -108,6 +109,11 @@ export async function POST(req: NextRequest) {
         mintAddress,
       },
     });
+
+    // Notify owner (but not if favoriting own work)
+    if (mint.wallet !== wallet) {
+      await notifyFavorite(mint.wallet, wallet, mintAddress);
+    }
 
     return NextResponse.json({ success: true });
   } catch (err: any) {

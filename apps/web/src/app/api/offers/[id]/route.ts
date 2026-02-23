@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
+import { notifyOfferAccepted, notifyOfferRejected } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -78,6 +79,14 @@ export async function PATCH(
           },
         });
 
+        // Notify buyer
+        await notifyOfferAccepted(
+          offer.buyerWallet,
+          offer.sellerWallet,
+          offer.mintAddress,
+          Number(offer.priceLamports) / 1e9
+        );
+
         return NextResponse.json({
           success: true,
           message: "Offer accepted",
@@ -97,6 +106,14 @@ export async function PATCH(
           where: { id },
           data: { status: "rejected" },
         });
+
+        // Notify buyer
+        await notifyOfferRejected(
+          offer.buyerWallet,
+          offer.sellerWallet,
+          offer.mintAddress,
+          Number(offer.priceLamports) / 1e9
+        );
 
         return NextResponse.json({ success: true, message: "Offer rejected" });
 

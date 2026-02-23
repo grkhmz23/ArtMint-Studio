@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { trackSocial } from "@/lib/analytics";
 
 interface FavoriteButtonProps {
   mintAddress: string;
@@ -69,6 +70,7 @@ export function FavoriteButton({
         if (res.ok) {
           setIsFavorited(false);
           setCount((c) => Math.max(0, c - 1));
+          trackSocial("favorite_removed");
         }
       } else {
         // Add favorite
@@ -80,6 +82,7 @@ export function FavoriteButton({
         if (res.ok) {
           setIsFavorited(true);
           setCount((c) => c + 1);
+          trackSocial("favorite_added");
         }
       }
     } catch (err) {

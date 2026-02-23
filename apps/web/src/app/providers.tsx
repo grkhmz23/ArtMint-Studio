@@ -7,6 +7,7 @@ import {
 } from "@solana/wallet-adapter-react";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
 import { PhantomWalletAdapter, SolflareWalletAdapter } from "@solana/wallet-adapter-wallets";
+import { Toaster } from "sonner";
 import "@solana/wallet-adapter-react-ui/styles.css";
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -24,7 +25,20 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <ConnectionProvider endpoint={endpoint}>
       <WalletProvider wallets={wallets} autoConnect>
-        <WalletModalProvider>{children}</WalletModalProvider>
+        <WalletModalProvider>
+          {children}
+          <Toaster 
+            position="bottom-right"
+            toastOptions={{
+              style: {
+                background: "var(--bg-card)",
+                color: "var(--text)",
+                border: "1px solid var(--border)",
+                fontFamily: "var(--font-mono)",
+              },
+            }}
+          />
+        </WalletModalProvider>
       </WalletProvider>
     </ConnectionProvider>
   );

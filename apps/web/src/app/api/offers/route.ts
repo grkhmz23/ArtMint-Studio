@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { notifyOfferReceived } from "@/lib/notifications";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -163,6 +164,14 @@ export async function POST(req: NextRequest) {
         }),
       },
     });
+
+    // Send notification to seller
+    await notifyOfferReceived(
+      mint.wallet,
+      buyerWallet,
+      mintAddress,
+      Number(priceLamports) / 1e9
+    );
 
     return NextResponse.json({
       success: true,

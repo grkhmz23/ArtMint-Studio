@@ -41,6 +41,7 @@ model Mint {
   collectionItems CollectionItem[]
   offers        Offer[]
   auction       Auction?
+  notifications Notification[]
 
   @@index([wallet])
   @@index([status])
@@ -242,5 +243,26 @@ model Bid {
 
   @@index([auctionId])
   @@index([bidder])
+  @@index([createdAt])
+}
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+
+model Notification {
+  id              String   @id @default(cuid())
+  recipientWallet String
+  type            String   // "offer_received", "offer_accepted", "offer_rejected", "bid_placed", "outbid", "auction_won", "auction_ended", "follow", "favorite"
+  title           String
+  message         String
+  data            String?  // JSON blob with additional context
+  read            Boolean  @default(false)
+  mintAddress     String?
+  createdAt       DateTime @default(now())
+
+  mint            Mint?    @relation(fields: [mintAddress], references: [mintAddress], onDelete: SetNull)
+
+  @@index([recipientWallet])
+  @@index([recipientWallet, read])
+  @@index([type])
   @@index([createdAt])
 }

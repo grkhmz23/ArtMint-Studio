@@ -6,11 +6,19 @@ interface PageProps {
 }
 
 export default async function ProfilePage({ params }: PageProps) {
-  const mints = await prisma.mint.findMany({
-    where: { wallet: params.wallet },
-    include: { listing: true },
-    orderBy: { createdAt: "desc" },
-  });
+  const [mints, followerCount, followingCount] = await Promise.all([
+    prisma.mint.findMany({
+      where: { wallet: params.wallet },
+      include: { listing: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.follow.count({
+      where: { followingWallet: params.wallet },
+    }),
+    prisma.follow.count({
+      where: { followerWallet: params.wallet },
+    }),
+  ]);
 
   const serialized = mints.map((m) => ({
     ...m,
@@ -22,5 +30,12 @@ export default async function ProfilePage({ params }: PageProps) {
       : null,
   }));
 
-  return <ProfileClient wallet={params.wallet} mints={serialized} />;
+  return (
+    <ProfileClient
+      wallet={params.wallet}
+      mints={serialized}
+      followerCount={followerCount}
+      followingCount={followingCount}
+    />
+  );
 }

@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { fadeUp, staggerContainer } from "@/lib/animations";
 import { X, Layers, CheckSquare, Square } from "lucide-react";
+import { trackAIGeneration, trackEvent } from "@/lib/analytics";
 
 export default function StudioPage() {
   const { publicKey, signMessage } = useWallet();
@@ -136,6 +137,12 @@ export default function StudioPage() {
           setQuotaRemaining(data.quota.remaining);
           setQuotaLimit(data.quota.limit);
         }
+        // Track successful generation
+        trackAIGeneration(
+          selectedTemplate || data.variations[0]?.templateId || "unknown",
+          selectedPreset,
+          data.variations.length
+        );
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to generate");
       } finally {
@@ -147,6 +154,10 @@ export default function StudioPage() {
 
   const handleMoreLikeThis = useCallback(
     (variation: Variation) => {
+      trackEvent("ai_more_like_this", {
+        template_id: variation.templateId,
+        seed: variation.seed,
+      });
       generateVariations({
         templateId: variation.templateId,
         seed: variation.seed,

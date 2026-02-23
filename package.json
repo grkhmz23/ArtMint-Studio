@@ -22,7 +22,11 @@
       "prisma",
       "@resvg/resvg-js",
       "esbuild"
-    ]
+    ],
+    "overrides": {
+      "lodash": "^4.17.23",
+      "minimatch": "^10.2.1"
+    }
   },
   "devDependencies": {
     "prisma": "5.22.0"

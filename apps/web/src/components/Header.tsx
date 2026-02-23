@@ -5,11 +5,13 @@ import { usePathname } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { cn } from "@/lib/utils";
 import { WalletButton } from "./WalletButton";
+import { NotificationBell } from "./NotificationBell";
 
 const navLinks = [
   { path: "/dashboard", label: "Index" },
   { path: "/explore", label: "Explore" },
   { path: "/collections", label: "Collections" },
+  { path: "/auctions", label: "Auctions" },
   { path: "/offers", label: "Offers" },
   { path: "/activity", label: "Activity" },
   { path: "/studio", label: "AI Studio" },
@@ -72,8 +74,11 @@ export function Header() {
           )}
         </nav>
 
-        {/* Wallet */}
-        <WalletButton />
+        {/* Notifications & Wallet */}
+        <div className="flex items-center gap-2">
+          <NotificationBell />
+          <WalletButton />
+        </div>
       </div>
     </header>
   );

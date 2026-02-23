@@ -5,7 +5,9 @@ import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { fadeUp, staggerContainer } from "@/lib/animations";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Users, UserPlus } from "lucide-react";
+import { FollowButton } from "@/components/FollowButton";
+import { useState } from "react";
 
 interface MintItem {
   id: string;
@@ -23,10 +25,20 @@ interface MintItem {
 export function ProfileClient({
   wallet,
   mints,
+  followerCount: initialFollowerCount,
+  followingCount,
 }: {
   wallet: string;
   mints: MintItem[];
+  followerCount: number;
+  followingCount: number;
 }) {
+  const [followerCount, setFollowerCount] = useState(initialFollowerCount);
+
+  const handleFollowChange = (isFollowing: boolean) => {
+    setFollowerCount((prev) => (isFollowing ? prev + 1 : prev - 1));
+  };
+
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
@@ -34,18 +46,51 @@ export function ProfileClient({
 
       <div className="max-w-[1400px] mx-auto w-full p-6 lg:p-12">
         {/* Identity Banner */}
-        <div className="border-b border-[var(--border)] pb-12 mb-12 flex flex-col md:flex-row justify-between items-end gap-6">
-          <div>
-            <h1 className="font-serif text-5xl md:text-7xl text-white italic mb-4">
-              Your Archive.
-            </h1>
-            <p className="font-mono text-xs text-[var(--accent)] uppercase tracking-widest bg-[var(--accent)]/10 px-3 py-1 inline-block border border-[var(--accent)]">
-              Identity: {wallet.slice(0, 6)}...{wallet.slice(-4)}
-            </p>
-          </div>
-          <div className="font-mono text-xs uppercase tracking-widest text-right">
-            <div className="text-[var(--text-dim)] mb-1">Total Assets</div>
-            <div className="text-2xl text-white">{mints.length}</div>
+        <div className="border-b border-[var(--border)] pb-12 mb-12">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+            <div className="flex-1">
+              <h1 className="font-serif text-5xl md:text-7xl text-white italic mb-4">
+                Archive.
+              </h1>
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="font-mono text-xs text-[var(--accent)] uppercase tracking-widest bg-[var(--accent)]/10 px-3 py-1 inline-block border border-[var(--accent)]">
+                  {wallet.slice(0, 6)}...{wallet.slice(-4)}
+                </p>
+                
+                {/* Follow Stats */}
+                <div className="flex items-center gap-4 ml-2">
+                  <Link
+                    href={`/profile/${wallet}/followers`}
+                    className="flex items-center gap-1.5 font-mono text-[10px] text-[var(--text-dim)] hover:text-[var(--accent)] transition-colors"
+                  >
+                    <Users size={12} />
+                    <span className="text-white">{followerCount}</span>
+                    <span>followers</span>
+                  </Link>
+                  <Link
+                    href={`/profile/${wallet}/following`}
+                    className="flex items-center gap-1.5 font-mono text-[10px] text-[var(--text-dim)] hover:text-[var(--accent)] transition-colors"
+                  >
+                    <UserPlus size={12} />
+                    <span className="text-white">{followingCount}</span>
+                    <span>following</span>
+                  </Link>
+                </div>
+              </div>
+            </div>
+
+            {/* Follow Button & Stats */}
+            <div className="flex flex-col items-end gap-4">
+              <FollowButton
+                targetWallet={wallet}
+                variant="outline"
+                onFollowChange={handleFollowChange}
+              />
+              <div className="font-mono text-xs uppercase tracking-widest text-right">
+                <div className="text-[var(--text-dim)] mb-1">Total Assets</div>
+                <div className="text-2xl text-white">{mints.length}</div>
+              </div>
+            </div>
           </div>
         </div>
 

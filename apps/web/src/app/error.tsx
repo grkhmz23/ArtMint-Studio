@@ -1,81 +1,118 @@
 "use client";
 
 import { useEffect } from "react";
-import { logger } from "@/lib/logger";
+import Link from "next/link";
+import { Header } from "@/components/Header";
+import { AlertTriangle, RefreshCw, Home, Bug } from "lucide-react";
 
-interface ErrorBoundaryProps {
+export default function ErrorPage({
+  error,
+  reset,
+}: {
   error: Error & { digest?: string };
   reset: () => void;
-}
-
-/**
- * Global Error Boundary
- * 
- * Catches unhandled errors in the React component tree.
- * Logs errors and displays a user-friendly error message.
- */
-export default function GlobalError({ error, reset }: ErrorBoundaryProps) {
+}) {
   useEffect(() => {
-    // Log error to monitoring service
-    logger.error("Unhandled React error", {
-      digest: error.digest,
-      component: "GlobalError",
-    }, error);
+    // Log error to console for debugging
+    console.error("Application error:", error);
   }, [error]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-black text-white p-4">
-      <div className="max-w-md w-full text-center space-y-6">
-        <div className="w-16 h-16 mx-auto bg-red-500/20 rounded-full flex items-center justify-center">
-          <svg 
-            className="w-8 h-8 text-red-500" 
-            fill="none" 
-            viewBox="0 0 24 24" 
-            stroke="currentColor"
-          >
-            <path 
-              strokeLinecap="round" 
-              strokeLinejoin="round" 
-              strokeWidth={2} 
-              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" 
-            />
-          </svg>
-        </div>
-        
-        <div className="space-y-2">
-          <h1 className="text-2xl font-bold">Something went wrong</h1>
-          <p className="text-zinc-400">
-            We apologize for the inconvenience. Our team has been notified.
-          </p>
-        </div>
+    <div className="flex flex-col min-h-screen">
+      <Header />
+      <div className="noise-overlay" />
 
-        {process.env.NODE_ENV === "development" && (
-          <div className="text-left bg-zinc-900 rounded-lg p-4 overflow-auto">
-            <p className="text-xs text-zinc-500 mb-2">Error (development only):</p>
-            <pre className="text-xs text-red-400 font-mono whitespace-pre-wrap break-all">
-              {error.message}
-            </pre>
-            {error.digest && (
-              <p className="text-xs text-zinc-500 mt-2">
-                Error ID: {error.digest}
-              </p>
-            )}
+      <div className="flex-1 flex items-center justify-center p-6">
+        <div className="max-w-xl w-full text-center space-y-8">
+          {/* Error Code */}
+          <div className="relative">
+            <span className="font-serif text-[150px] md:text-[200px] leading-none text-[var(--danger)] opacity-10 select-none">
+              500
+            </span>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <AlertTriangle size={64} className="text-[var(--danger)]" />
+            </div>
           </div>
-        )}
 
-        <div className="flex gap-4 justify-center">
-          <button
-            onClick={reset}
-            className="px-6 py-2 bg-white text-black rounded-lg font-medium hover:bg-zinc-200 transition-colors"
-          >
-            Try Again
-          </button>
-          <a
-            href="/"
-            className="px-6 py-2 bg-zinc-800 text-white rounded-lg font-medium hover:bg-zinc-700 transition-colors"
-          >
-            Go Home
-          </a>
+          {/* Message */}
+          <div className="space-y-4">
+            <h1 className="font-serif text-4xl md:text-5xl text-white">
+              Something Went Wrong
+            </h1>
+            <p className="font-mono text-sm text-[var(--text-dim)] max-w-md mx-auto">
+              We encountered an unexpected error. Please try again or contact
+              support if the problem persists.
+            </p>
+          </div>
+
+          {/* Error Details (dev mode only) */}
+          {process.env.NODE_ENV === "development" && (
+            <div className="p-4 border border-[var(--danger)]/30 bg-[var(--danger)]/5 text-left">
+              <div className="flex items-center gap-2 mb-2 text-[var(--danger)]">
+                <Bug size={14} />
+                <span className="font-mono text-[10px] uppercase tracking-widest">
+                  Error Details (Development Only)
+                </span>
+              </div>
+              <p className="font-mono text-xs text-[var(--danger)] break-all">
+                {error.message}
+              </p>
+              {error.digest && (
+                <p className="font-mono text-[10px] text-[var(--text-dim)] mt-2">
+                  Error ID: {error.digest}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4">
+            <button
+              onClick={reset}
+              className="flex items-center gap-2 px-6 py-3 bg-[var(--accent)] text-black font-mono text-xs uppercase tracking-widest hover:bg-[var(--accent-hover)] transition-colors w-full sm:w-auto justify-center"
+            >
+              <RefreshCw size={14} />
+              Try Again
+            </button>
+            <Link
+              href="/"
+              className="flex items-center gap-2 px-6 py-3 border border-[var(--border)] text-white font-mono text-xs uppercase tracking-widest hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors w-full sm:w-auto justify-center"
+            >
+              <Home size={14} />
+              Back to Home
+            </Link>
+          </div>
+
+          {/* Support */}
+          <div className="pt-8 border-t border-[var(--border)]">
+            <p className="font-mono text-[10px] text-[var(--text-dim)] uppercase tracking-widest mb-4">
+              Need Help?
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <a
+                href="https://twitter.com/artmintstudio"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-mono text-xs text-[var(--text-dim)] hover:text-[var(--accent)] transition-colors"
+              >
+                Contact on Twitter/X
+              </a>
+              <span className="hidden sm:block text-[var(--border)]">•</span>
+              <a
+                href="mailto:support@artmint.studio"
+                className="font-mono text-xs text-[var(--text-dim)] hover:text-[var(--accent)] transition-colors"
+              >
+                Email Support
+              </a>
+              <span className="hidden sm:block text-[var(--border)]">•</span>
+              <Link
+                href="/docs"
+                className="font-mono text-xs text-[var(--text-dim)] hover:text-[var(--accent)] transition-colors"
+              >
+                Documentation
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     </div>

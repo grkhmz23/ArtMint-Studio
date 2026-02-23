@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
+import { trackOffer } from "@/lib/analytics";
 
 interface Offer {
   id: string;
@@ -78,6 +79,12 @@ export default function OffersPage() {
         throw new Error(err.error || "Failed to accept");
       }
 
+      // Track offer acceptance
+      const offer = receivedOffers.find(o => o.id === offerId);
+      if (offer) {
+        trackOffer("accepted", offer.priceSol);
+      }
+
       fetchOffers();
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to accept offer");
@@ -100,6 +107,12 @@ export default function OffersPage() {
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error || "Failed to reject");
+      }
+
+      // Track offer rejection
+      const offer = receivedOffers.find(o => o.id === offerId);
+      if (offer) {
+        trackOffer("rejected", offer.priceSol);
       }
 
       fetchOffers();

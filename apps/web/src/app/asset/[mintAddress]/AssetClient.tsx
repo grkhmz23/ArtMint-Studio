@@ -14,6 +14,8 @@ import { cn } from "@/lib/utils";
 import { FullscreenPreview, FullscreenButton } from "@/components/FullscreenPreview";
 import { FavoriteButton } from "@/components/FavoriteButton";
 import { MakeOfferButton } from "@/components/MakeOfferButton";
+import { CreateAuctionModal } from "@/components/CreateAuctionModal";
+import { trackListing } from "@/lib/analytics";
 
 interface MintData {
   id: string;
@@ -67,6 +69,7 @@ export function AssetClient({ mint }: { mint: MintData }) {
   const [showLive, setShowLive] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
+  const [showAuctionModal, setShowAuctionModal] = useState(false);
 
   const parsedInput = useMemo(() => {
     try {
@@ -253,6 +256,7 @@ export function AssetClient({ mint }: { mint: MintData }) {
         // If it's a 202 (Accepted), the tx is still processing
         if (confirmRes.status === 202) {
           setListingStep("success");
+          trackListing("confirmed", parseFloat(listPrice));
           // Reload after a delay to show the listing
           setTimeout(() => window.location.reload(), 3000);
           return;
@@ -261,6 +265,7 @@ export function AssetClient({ mint }: { mint: MintData }) {
       }
 
       setListingStep("success");
+      trackListing("confirmed", parseFloat(listPrice));
       
       // Reload to show updated state
       setTimeout(() => window.location.reload(), 2000);
@@ -299,6 +304,7 @@ export function AssetClient({ mint }: { mint: MintData }) {
 
   const isListingInProgress = listingStep !== "idle" && listingStep !== "success";
   const isListed = mint.listing?.status === "active";
+  const isOwner = publicKey?.toBase58() === mint.wallet;
 
   const provenanceRows = isUpload
     ? [
@@ -620,8 +626,20 @@ export function AssetClient({ mint }: { mint: MintData }) {
                   )}
                   
                   {/* Success message with explorer link */}
+                  {/* Create Auction Button - only show if not listed and is owner */}
+                  {!isListed && isOwner && (
+                    <div className="mt-4 pt-4 border-t border-[var(--border)]">
+                      <button
+                        onClick={() => setShowAuctionModal(true)}
+                        className="w-full border border-[var(--accent)] py-3 font-mono text-[10px] uppercase tracking-widest text-[var(--accent)] hover:bg-[var(--accent)] hover:text-black transition-colors"
+                      >
+                        Create Auction
+                      </button>
+                    </div>
+                  )}
+
                   {/* Make Offer Button - only show if not listed and not owner */}
-                  {!isListed && publicKey?.toBase58() !== mint.wallet && (
+                  {!isListed && !isOwner && (
                     <div className="mt-4 pt-4 border-t border-[var(--border)]">
                       <MakeOfferButton
                         mintAddress={mint.mintAddress}
@@ -689,6 +707,16 @@ export function AssetClient({ mint }: { mint: MintData }) {
           </div>
         </div>
       </div>
+
+      {/* Create Auction Modal */}
+      <CreateAuctionModal
+        isOpen={showAuctionModal}
+        onClose={() => setShowAuctionModal(false)}
+        mintAddress={mint.mintAddress}
+        title={mint.title ?? "Untitled"}
+        imageUrl={mint.imageUrl}
+        onSuccess={() => window.location.href = "/auctions"}
+      />
     </div>
   );
 }
