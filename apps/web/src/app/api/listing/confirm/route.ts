@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { PublicKey } from "@solana/web3.js";
+import { Prisma } from "@prisma/client";
+import { PROGRAM_IDS } from "@artmint/exchangeart";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { verifyTransaction } from "@/lib/solana-verify";
 import { getConnection } from "@/lib/rpc";
+import { verifyBuyNowListingInstruction } from "@/lib/exchangeart-listing-verify";
 
 export const dynamic = "force-dynamic";
 
@@ -119,7 +122,13 @@ export async function POST(req: NextRequest) {
     }
 
     // 7. Verify the transaction on-chain using RPC manager
-    const verifyResult = await verifyTransaction(txSignature, wallet);
+    const verifyResult = await verifyTransaction(
+      txSignature,
+      wallet,
+      mintAddress,
+      [saleStateKey],
+      [PROGRAM_IDS.buyNowEditions.toBase58()]
+    );
     
     if (!verifyResult.valid) {
       return NextResponse.json(
@@ -135,6 +144,47 @@ export async function POST(req: NextRequest) {
     const connection = getConnection();
 
     try {
+      const tx = await connection.getTransaction(txSignature, {
+        maxSupportedTransactionVersion: 0,
+      });
+
+      if (!tx) {
+        return NextResponse.json(
+          { error: "Transaction not found during deep verification", code: "tx_not_found" },
+          { status: 503 }
+        );
+      }
+
+      const ixCheck = verifyBuyNowListingInstruction({
+        message: tx.transaction.message as Parameters<typeof verifyBuyNowListingInstruction>[0]["message"],
+        expectedProgramId: PROGRAM_IDS.buyNowEditions.toBase58(),
+        expectedSeller: wallet,
+        expectedMintAddress: mintAddress,
+        expectedSaleStateKey: saleStateKey,
+        expectedPriceLamports: listing.priceLamports.toString(),
+      });
+
+      if (!ixCheck.ok) {
+        return NextResponse.json(
+          {
+            error: ixCheck.error || "Listing instruction validation failed",
+            code: "invalid_listing_instruction",
+          },
+          { status: 400 }
+        );
+      }
+    } catch (err) {
+      console.error("Failed to deeply verify listing transaction:", err);
+      return NextResponse.json(
+        {
+          error: "Failed to deeply verify listing transaction",
+          code: "listing_instruction_verification_failed",
+        },
+        { status: 503 }
+      );
+    }
+
+    try {
       const saleStateAccount = await connection.getAccountInfo(
         new PublicKey(saleStateKey)
       );
@@ -148,21 +198,51 @@ export async function POST(req: NextRequest) {
           { status: 202 } // Accepted but not yet processed
         );
       }
+
+      if (!saleStateAccount.owner.equals(PROGRAM_IDS.buyNowEditions)) {
+        return NextResponse.json(
+          {
+            error: "Sale state account owner is not Exchange Art Buy Now program",
+            code: "invalid_sale_state_owner",
+          },
+          { status: 400 }
+        );
+      }
     } catch (err) {
       console.error("Failed to check sale state account:", err);
-      // Continue anyway - the transaction was verified, account might exist
+      return NextResponse.json(
+        {
+          error: "Failed to verify sale state account",
+          code: "sale_state_verification_failed",
+        },
+        { status: 503 }
+      );
     }
 
     // 9. Update listing to active
-    const updatedListing = await prisma.listing.update({
-      where: { mintAddress },
-      data: {
-        status: "active",
-        txSignature,
-        saleStateKey,
-        updatedAt: new Date(),
-      },
-    });
+    let updatedListing;
+    try {
+      updatedListing = await prisma.listing.update({
+        where: { mintAddress },
+        data: {
+          status: "active",
+          txSignature,
+          saleStateKey,
+          updatedAt: new Date(),
+        },
+      });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === "P2002"
+      ) {
+        return NextResponse.json(
+          { error: "Transaction signature already used", code: "tx_replay" },
+          { status: 409 }
+        );
+      }
+      throw err;
+    }
 
     // Log activity
     await prisma.activity.create({

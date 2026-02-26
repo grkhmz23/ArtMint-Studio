@@ -9,7 +9,6 @@ import { ArrowRight, Users, UserPlus, Globe, Twitter, MessageCircle, Settings } 
 import { FollowButton } from "@/components/FollowButton";
 import { useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { cn } from "@/lib/utils";
 
 interface MintItem {
   id: string;
@@ -17,7 +16,8 @@ interface MintItem {
   imageUrl: string;
   title: string | null;
   hash: string;
-  createdAt: Date;
+  status: string;
+  createdAt: string;
   listing: {
     status: string;
     priceLamports: string;
@@ -248,7 +248,16 @@ export function ProfileClient({
                     </h3>
 
                     <div className="mt-auto pt-4 border-t border-[var(--border)] flex justify-between items-end font-mono uppercase tracking-widest">
-                      {m.listing?.status === "active" ? (
+                      {m.status !== "confirmed" ? (
+                        <>
+                          <span className="text-[9px] text-[var(--accent)]">
+                            Pending Mint
+                          </span>
+                          <span className="text-[9px] text-[var(--text-dim)]">
+                            complete on-chain
+                          </span>
+                        </>
+                      ) : m.listing?.status === "active" ? (
                         <>
                           <span className="text-[9px] text-[var(--success)]">
                             Market

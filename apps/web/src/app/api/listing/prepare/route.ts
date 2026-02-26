@@ -219,7 +219,6 @@ export async function POST(req: NextRequest) {
       prepared: {
         serializedTransaction: preparedTx.serializedTransaction,
         saleStatePublicKey: preparedTx.saleStatePublicKey,
-        saleStateSecretKey: preparedTx.saleStateSecretKey,
         blockhash: preparedTx.blockhash,
         lastValidBlockHeight: preparedTx.lastValidBlockHeight,
         estimatedFee: preparedTx.estimatedFee,

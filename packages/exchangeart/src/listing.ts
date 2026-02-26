@@ -37,8 +37,6 @@ export interface PreparedListingTransaction {
   serializedTransaction: string;
   /** Sale state account public key */
   saleStatePublicKey: string;
-  /** Sale state account secret key (base64) - client must sign with this */
-  saleStateSecretKey: string;
   /** Blockhash used in transaction (for expiry checking) */
   blockhash: string;
   /** Block height at which transaction was prepared */
@@ -149,8 +147,9 @@ export async function buildCreateBuyNowTransaction(
 /**
  * Prepare a listing transaction for client-side signing.
  * 
- * This function builds the transaction and serializes it along with the
- * sale state keypair data that the client needs to sign.
+ * This function builds the transaction and serializes it for client-side wallet signing.
+ * The sale state keypair is generated and partially signed server-side and only the
+ * public key is returned to the client.
  * 
  * @param params - Parameters for creating the listing
  * @returns Prepared transaction ready for client signing
@@ -191,7 +190,6 @@ export async function prepareListingTransaction(
   return {
     serializedTransaction,
     saleStatePublicKey: saleStateKeypair.publicKey.toBase58(),
-    saleStateSecretKey: Buffer.from(saleStateKeypair.secretKey).toString("base64"),
     blockhash,
     lastValidBlockHeight,
     estimatedFee,

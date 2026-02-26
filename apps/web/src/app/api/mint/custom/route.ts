@@ -3,22 +3,88 @@ import { z } from "zod";
 import { buildCustomCodeArtifact, buildCustomSvgArtifact, RENDERER_VERSION } from "@artmint/render";
 import { computeHash, stableStringify } from "@artmint/common";
 import { uploadFile } from "@/lib/storage";
+import { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/db";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth";
 
-const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+const hexColor = z
+  .string()
+  .regex(/^#[0-9a-fA-F]{6}$/)
+  .transform((value) => value.toLowerCase());
+const METAPLEX_NAME_MAX_BYTES = 32;
+
+function normalizeOptionalText(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function normalizeCodeForCanonicalization(code: string): string {
+  return code.replace(/\r\n?/g, "\n");
+}
+
+async function buildDuplicatePendingMintResponse(
+  placeholderMintAddress: string,
+  wallet: string,
+  fallbackCanonicalInput: unknown
+): Promise<NextResponse | null> {
+  const existing = await prisma.mint.findUnique({
+    where: { mintAddress: placeholderMintAddress },
+  });
+
+  if (!existing) return null;
+
+  if (existing.wallet !== wallet) {
+    return NextResponse.json(
+      {
+        error: "An identical pending mint already exists for another wallet",
+        code: "duplicate_pending_mint",
+      },
+      { status: 409 }
+    );
+  }
+
+  let canonicalInput = fallbackCanonicalInput;
+  try {
+    canonicalInput = JSON.parse(existing.inputJson);
+  } catch {
+    // Fall back to this request's canonical input.
+  }
+
+  return NextResponse.json({
+    success: true,
+    reused: true,
+    hash: existing.hash,
+    metadataUrl: existing.metadataUrl,
+    imageUrl: existing.imageUrl,
+    animationUrl: existing.animationUrl,
+    placeholderMintAddress: existing.mintAddress,
+    canonicalInput,
+  });
+}
 
 const customMintSchema = z.object({
   code: z.string().min(1).max(100_000),
   mode: z.enum(["svg", "javascript"]).default("svg"),
   seed: z.number().int().min(0).max(999999999),
   palette: z.array(hexColor).min(2).max(8),
-  title: z.string().max(200).optional(),
-  description: z.string().max(500).optional(),
-  pngBase64: z.string().min(1).max(10_000_000),
+  title: z.string().trim().max(200).optional(),
+  description: z.string().trim().max(500).optional(),
+  pngBase64: z
+    .string()
+    .min(1)
+    .max(10_000_000)
+    .regex(/^data:image\/(?:png|jpeg|jpg|webp);base64,[A-Za-z0-9+/=]+$/),
+}).superRefine((data, ctx) => {
+  if (data.title && Buffer.byteLength(data.title, "utf8") > METAPLEX_NAME_MAX_BYTES) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["title"],
+      message: `Title exceeds on-chain metadata limit (${METAPLEX_NAME_MAX_BYTES} UTF-8 bytes max)`,
+    });
+  }
 });
 
 export async function POST(req: NextRequest) {
@@ -45,7 +111,10 @@ export async function POST(req: NextRequest) {
     }
   } catch (err) {
     console.error("Custom mint rate limit error:", err);
-    // Continue — fail open on rate limit errors
+    return NextResponse.json(
+      { error: "Rate limit service unavailable", code: "rate_limit_unavailable" },
+      { status: 503 }
+    );
   }
 
   // Body size guard
@@ -71,7 +140,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { code, mode, seed, palette, title, description, pngBase64 } = parsed.data;
+  const seed = parsed.data.seed;
+  const mode = parsed.data.mode;
+  const palette = parsed.data.palette;
+  const title = normalizeOptionalText(parsed.data.title);
+  const description = normalizeOptionalText(parsed.data.description);
+  const pngBase64 = parsed.data.pngBase64;
+  const code = normalizeCodeForCanonicalization(parsed.data.code);
 
   try {
     // Decode base64 image from client canvas capture (supports png and jpeg data URLs)
@@ -94,6 +169,14 @@ export async function POST(req: NextRequest) {
     };
     const hash = computeHash(deterministicInput);
     const canonicalInput = { ...deterministicInput, createdAt };
+    const placeholderMintAddress = `pending-${hash.slice(0, 16)}`;
+
+    const duplicateBeforeUpload = await buildDuplicatePendingMintResponse(
+      placeholderMintAddress,
+      wallet,
+      canonicalInput
+    );
+    if (duplicateBeforeUpload) return duplicateBeforeUpload;
 
     // Build HTML artifact
     let htmlArtifact: string;
@@ -160,7 +243,6 @@ export async function POST(req: NextRequest) {
     }
 
     // Save to database
-    const placeholderMintAddress = `pending-${hash.slice(0, 16)}`;
     try {
       await prisma.mint.create({
         data: {
@@ -175,6 +257,23 @@ export async function POST(req: NextRequest) {
         },
       });
     } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === "P2002"
+      ) {
+        const duplicateAfterUpload = await buildDuplicatePendingMintResponse(
+          placeholderMintAddress,
+          wallet,
+          canonicalInput
+        );
+        if (duplicateAfterUpload) return duplicateAfterUpload;
+
+        return NextResponse.json(
+          { error: "Duplicate pending mint", code: "duplicate_pending_mint" },
+          { status: 409 }
+        );
+      }
+
       const msg = err instanceof Error ? err.message : String(err);
       console.error("Database save error:", msg);
       return NextResponse.json({ error: `Database save failed: ${msg}` }, { status: 500 });

@@ -1,5 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 
+const SANDBOXED_ARTIFACT_CSP = [
+  "default-src 'none'",
+  "script-src 'unsafe-inline'",
+  "style-src 'unsafe-inline'",
+  "img-src data: blob:",
+  "connect-src 'none'",
+  "font-src 'none'",
+  "media-src 'none'",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'none'",
+  "frame-ancestors 'self'",
+  "sandbox allow-scripts allow-downloads",
+].join("; ");
+
 function getUrlOrigin(value: string | undefined): string | null {
   if (!value) return null;
   try {
@@ -9,6 +24,10 @@ function getUrlOrigin(value: string | undefined): string | null {
   }
 }
 
+function isUploadedHtmlArtifact(pathname: string): boolean {
+  return pathname.startsWith("/uploads/") && pathname.toLowerCase().endsWith(".html");
+}
+
 /**
  * Next.js middleware for security headers and CORS.
  */
@@ -16,9 +35,10 @@ export function middleware(req: NextRequest) {
   const res = NextResponse.next();
   const origin = req.headers.get("origin") ?? "";
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const pathname = req.nextUrl.pathname;
 
   // CORS: only allow same-origin requests to API routes
-  if (req.nextUrl.pathname.startsWith("/api/")) {
+  if (pathname.startsWith("/api/")) {
     // Allow requests with no origin (same-origin, server-to-server)
     if (origin) {
       // Compare host portion to handle http/https and trailing slash differences
@@ -49,10 +69,19 @@ export function middleware(req: NextRequest) {
     res.headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
   }
 
+  // Untrusted HTML artifacts (local storage mode) need a sandboxed CSP to prevent
+  // same-origin script execution when opened directly in a tab.
+  if (isUploadedHtmlArtifact(pathname)) {
+    res.headers.set("X-Frame-Options", "SAMEORIGIN");
+    res.headers.set("Referrer-Policy", "no-referrer");
+    res.headers.set("Content-Security-Policy", SANDBOXED_ARTIFACT_CSP);
+    return res;
+  }
+
   // CSP for pages — allow inline styles (needed for React inline styles),
   // wallet adapter scripts, and self for everything else.
   // Note: the render API sets its own restrictive CSP on SVG responses.
-  if (!req.nextUrl.pathname.startsWith("/api/")) {
+  if (!pathname.startsWith("/api/")) {
     const connectSrc = new Set([
       "'self'",
       "https://api.devnet.solana.com",

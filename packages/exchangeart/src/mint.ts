@@ -45,6 +45,61 @@ export interface MintNftResult {
   mintAddress: PublicKey;
 }
 
+export interface PreparedMintNftTransaction {
+  /** Serialized transaction (base64) - ready for wallet signing */
+  serializedTransaction: string;
+  /** Mint public key that will be created by this transaction */
+  mintAddress: string;
+  /** Blockhash used in transaction (for expiry checking) */
+  blockhash: string;
+  /** Block height at which transaction was prepared */
+  lastValidBlockHeight: number;
+  /** Estimated fee in lamports */
+  estimatedFee: number;
+}
+
+export class MintMetadataValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "MintMetadataValidationError";
+  }
+}
+
+const METAPLEX_METADATA_LIMITS = {
+  nameBytes: 32,
+  symbolBytes: 10,
+  uriBytes: 200,
+} as const;
+
+function assertUtf8ByteLength(field: string, value: string, maxBytes: number): void {
+  const length = Buffer.byteLength(value, "utf8");
+  if (length > maxBytes) {
+    throw new MintMetadataValidationError(
+      `${field} exceeds Metaplex limit (${length} bytes > ${maxBytes} bytes)`
+    );
+  }
+}
+
+function assertValidHttpMetadataUri(uri: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(uri);
+  } catch {
+    throw new MintMetadataValidationError("Metadata URI must be an absolute URL");
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new MintMetadataValidationError("Metadata URI must use http:// or https://");
+  }
+}
+
+function validateMetaplexMetadataFields(params: { name: string; symbol: string; metadataUri: string }): void {
+  const { name, symbol, metadataUri } = params;
+  assertUtf8ByteLength("Metadata name", name, METAPLEX_METADATA_LIMITS.nameBytes);
+  assertUtf8ByteLength("Metadata symbol", symbol, METAPLEX_METADATA_LIMITS.symbolBytes);
+  assertUtf8ByteLength("Metadata URI", metadataUri, METAPLEX_METADATA_LIMITS.uriBytes);
+  assertValidHttpMetadataUri(metadataUri);
+}
+
 /**
  * Build a transaction to mint an NFT using Metaplex Token Metadata standard.
  * The metadata JSON at metadataUri contains the Exchange Art / Code Canvas provenance info.
@@ -60,6 +115,8 @@ export async function buildMintNftTransaction(
     symbol = "ARTMINT",
     sellerFeeBasisPoints = 500,
   } = params;
+
+  validateMetaplexMetadataFields({ name, symbol, metadataUri });
 
   const mintKeypair = Keypair.generate();
   const mintPubkey = mintKeypair.publicKey;
@@ -165,6 +222,45 @@ export async function buildMintNftTransaction(
     transaction,
     mintKeypair,
     mintAddress: mintPubkey,
+  };
+}
+
+/**
+ * Prepare a mint transaction for client-side wallet signing.
+ * The server generates and partially signs the mint account keypair,
+ * then returns a serialized transaction and the resulting mint address.
+ */
+export async function prepareMintNftTransaction(
+  params: MintNftParams
+): Promise<PreparedMintNftTransaction> {
+  const { connection } = params;
+  const { transaction, mintKeypair, mintAddress } = await buildMintNftTransaction(params);
+
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+  transaction.recentBlockhash = blockhash;
+
+  let estimatedFee = 5000;
+  try {
+    const fee = await connection.getFeeForMessage(transaction.compileMessage());
+    if (fee.value !== null) {
+      estimatedFee = fee.value;
+    }
+  } catch {
+    // fall back to default fee estimate
+  }
+
+  transaction.partialSign(mintKeypair);
+
+  const serializedTransaction = Buffer.from(
+    transaction.serialize({ requireAllSignatures: false })
+  ).toString("base64");
+
+  return {
+    serializedTransaction,
+    mintAddress: mintAddress.toBase58(),
+    blockhash,
+    lastValidBlockHeight,
+    estimatedFee,
   };
 }
 

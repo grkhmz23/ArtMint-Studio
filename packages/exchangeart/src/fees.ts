@@ -13,6 +13,7 @@
 
 import {
   Transaction,
+  TransactionInstruction,
   ComputeBudgetProgram,
   Connection,
 } from "@solana/web3.js";
@@ -98,7 +99,7 @@ export async function getPriorityFeeEstimate(
     }
     
     const index = Math.floor(fees.length * 0.75);
-    const percentileFee = fees[index] || fees[fees.length - 1];
+    const percentileFee = fees[index] ?? fees[fees.length - 1]!;
 
     // Add 20% buffer
     const recommendedFee = Math.ceil(percentileFee * 1.2);
@@ -193,17 +194,22 @@ export async function addPriorityFees(
     fee = await getPriorityFeeEstimate(connection);
   }
 
-  // Add compute unit limit instruction (must be first)
+  const computeBudgetIxs: TransactionInstruction[] = [];
+
+  // Compute budget instructions should be prepended before all other instructions.
   if (computeUnits) {
-    transaction.add(
+    computeBudgetIxs.push(
       ComputeBudgetProgram.setComputeUnitLimit({ units: computeUnits })
     );
   }
 
-  // Add priority fee instruction (after compute limit)
-  transaction.add(
+  computeBudgetIxs.push(
     ComputeBudgetProgram.setComputeUnitPrice({ microLamports: fee })
   );
+
+  if (computeBudgetIxs.length > 0) {
+    transaction.instructions = [...computeBudgetIxs, ...transaction.instructions];
+  }
 }
 
 /**

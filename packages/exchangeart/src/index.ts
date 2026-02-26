@@ -1,5 +1,12 @@
 export { PROGRAM_IDS } from "./constants";
-export { buildMintNftTransaction } from "./mint";
+export {
+  buildMintNftTransaction,
+  prepareMintNftTransaction,
+  MintMetadataValidationError,
+  type MintNftParams,
+  type MintNftResult,
+  type PreparedMintNftTransaction,
+} from "./mint";
 export { 
   buildCreateBuyNowTransaction,
   prepareListingTransaction,

@@ -53,7 +53,7 @@ model Listing {
   mintAddress   String   @unique
   priceLamports BigInt
   status        String   @default("pending") // pending, active, sold, cancelled
-  txSignature   String?
+  txSignature   String?  @unique
   saleStateKey  String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

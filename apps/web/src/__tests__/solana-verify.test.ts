@@ -112,6 +112,63 @@ describe("solana-verify: verifyTransaction", () => {
     expect(result.error).toContain("not referenced");
   });
 
+  it("rejects when a required account is missing", async () => {
+    mockGetTransaction.mockResolvedValue({
+      meta: { err: null },
+      blockTime: Math.floor(Date.now() / 1000),
+      transaction: {
+        message: {
+          getAccountKeys: () => ({
+            get: (i: number) => {
+              if (i === 0) return { toBase58: () => wallet };
+              if (i === 1) return { toBase58: () => mintAddr };
+              return null;
+            },
+            length: 2,
+          }),
+        },
+      },
+    });
+
+    const result = await verifyTransaction(txSig, wallet, mintAddr, [
+      "SaleState1111111111111111111111111111111111",
+    ]);
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain("Required account");
+  });
+
+  it("rejects when a required program is not invoked", async () => {
+    mockGetTransaction.mockResolvedValue({
+      meta: { err: null },
+      blockTime: Math.floor(Date.now() / 1000),
+      transaction: {
+        message: {
+          getAccountKeys: () => ({
+            get: (i: number) => {
+              if (i === 0) return { toBase58: () => wallet };
+              if (i === 1) return { toBase58: () => mintAddr };
+              if (i === 2) return { toBase58: () => "ExpectedProgram111111111111111111111111111111" };
+              if (i === 3) return { toBase58: () => "DifferentProgram1111111111111111111111111111" };
+              return null;
+            },
+            length: 4,
+          }),
+          compiledInstructions: [{ programIdIndex: 3 }],
+        },
+      },
+    });
+
+    const result = await verifyTransaction(
+      txSig,
+      wallet,
+      mintAddr,
+      [],
+      ["ExpectedProgram111111111111111111111111111111"]
+    );
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain("Required program");
+  });
+
   it("accepts valid transaction with matching wallet", async () => {
     mockGetTransaction.mockResolvedValue({
       meta: { err: null },

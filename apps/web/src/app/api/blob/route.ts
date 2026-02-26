@@ -3,6 +3,27 @@ import { head } from "@vercel/blob";
 
 export const dynamic = "force-dynamic";
 
+// Untrusted HTML artifacts must run in a sandboxed document, even on the app origin.
+const SANDBOXED_ARTIFACT_CSP = [
+  "default-src 'none'",
+  "script-src 'unsafe-inline'",
+  "style-src 'unsafe-inline'",
+  "img-src data: blob:",
+  "connect-src 'none'",
+  "font-src 'none'",
+  "media-src 'none'",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'none'",
+  "frame-ancestors 'self'",
+  "sandbox allow-scripts allow-downloads",
+].join("; ");
+
+function isHtmlContentType(contentType: string | undefined): boolean {
+  if (!contentType) return false;
+  return contentType.split(";")[0]?.trim().toLowerCase() === "text/html";
+}
+
 /**
  * GET /api/blob?url=<encoded-vercel-blob-url>
  *
@@ -30,6 +51,8 @@ export async function GET(req: NextRequest) {
   try {
     // Get blob metadata to confirm it exists and get content type
     const blobInfo = await head(blobUrl);
+    const contentType = blobInfo.contentType || "application/octet-stream";
+    const isHtml = isHtmlContentType(contentType);
 
     // Fetch the actual blob data using the token (set automatically by @vercel/blob)
     const response = await fetch(blobUrl, {
@@ -46,9 +69,14 @@ export async function GET(req: NextRequest) {
 
     return new NextResponse(data, {
       headers: {
-        "Content-Type": blobInfo.contentType,
+        "Content-Type": contentType,
         "Cache-Control": "public, max-age=31536000, immutable",
         "Content-Length": String(data.byteLength),
+        "X-Content-Type-Options": "nosniff",
+        // Allow the asset page to iframe the artifact, but keep other pages framed-denied.
+        ...(isHtml ? { "X-Frame-Options": "SAMEORIGIN" } : {}),
+        ...(isHtml ? { "Referrer-Policy": "no-referrer" } : {}),
+        ...(isHtml ? { "Content-Security-Policy": SANDBOXED_ARTIFACT_CSP } : {}),
       },
     });
   } catch (err) {

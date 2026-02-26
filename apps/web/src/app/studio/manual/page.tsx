@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { Header } from "@/components/Header";
 import { TemplateSelector } from "@/components/studio/TemplateSelector";
 import { SeedInput } from "@/components/studio/SeedInput";
@@ -19,6 +20,7 @@ import {
 } from "@artmint/common";
 
 export default function ManualStudioPage() {
+  const router = useRouter();
   const { publicKey } = useWallet();
   const { authenticated, signingIn, signIn, error: authError } = useAuth();
 
@@ -62,6 +64,10 @@ export default function ManualStudioPage() {
     if (!res.ok) {
       const err = await res.json();
       throw new Error(err.error ?? "Mint failed");
+    }
+    const data = await res.json();
+    if (data.placeholderMintAddress) {
+      router.push(`/asset/${data.placeholderMintAddress}`);
     }
   };
 

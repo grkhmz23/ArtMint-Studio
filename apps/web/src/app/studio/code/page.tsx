@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Header } from "@/components/Header";
 import { CodeEditor } from "@/components/studio/CodeEditor";
 import {
@@ -20,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { Play, Save, TerminalSquare, X, HelpCircle } from "lucide-react";
 
 export default function CodeStudioPage() {
+  const router = useRouter();
   const { publicKey } = useWallet();
   const { authenticated, signingIn, signIn, error: authError } = useAuth();
 
@@ -94,7 +96,12 @@ export default function CodeStudioPage() {
         const err = await res.json();
         throw new Error(err.error ?? "Mint failed");
       }
+      const data = await res.json();
+      if (!data.placeholderMintAddress) {
+        throw new Error("Mint was prepared, but no placeholder asset was returned");
+      }
       setMintSuccess(true);
+      router.push(`/asset/${data.placeholderMintAddress}`);
     } catch (err) {
       setMintError(err instanceof Error ? err.message : "Mint failed");
     } finally {
@@ -292,12 +299,12 @@ export default function CodeStudioPage() {
             onClick={handleMint}
             disabled={!authenticated || mintLoading || !!renderError}
           >
-            {mintLoading ? "Minting..." : "Mint to Chain"}
+            {mintLoading ? "Preparing..." : "Prepare Mint"}
           </Button>
 
           {mintSuccess && (
             <span className="font-mono text-[10px] text-[var(--success)] uppercase tracking-widest">
-              Minted!
+              Prepared
             </span>
           )}
         </div>

@@ -1,30 +1,60 @@
 import { prisma } from "@/lib/db";
 import { ProfileClient } from "./ProfileClient";
+import { notFound } from "next/navigation";
 
 interface PageProps {
-  params: { wallet: string };
+  params: { wallet: string } | Promise<{ wallet: string }>;
 }
 
 export default async function ProfilePage({ params }: PageProps) {
+  const { wallet } = await Promise.resolve(params);
+  if (!wallet) notFound();
+
   const [mints, followerCount, followingCount, profile] = await Promise.all([
     prisma.mint.findMany({
-      where: { wallet: params.wallet },
-      include: { listing: true },
+      where: { wallet },
+      select: {
+        id: true,
+        mintAddress: true,
+        imageUrl: true,
+        title: true,
+        hash: true,
+        status: true,
+        createdAt: true,
+        listing: {
+          select: {
+            status: true,
+            priceLamports: true,
+          },
+        },
+      },
       orderBy: { createdAt: "desc" },
     }),
     prisma.follow.count({
-      where: { followingWallet: params.wallet },
+      where: { followingWallet: wallet },
     }),
     prisma.follow.count({
-      where: { followerWallet: params.wallet },
+      where: { followerWallet: wallet },
     }),
     prisma.userProfile.findUnique({
-      where: { wallet: params.wallet },
+      where: { wallet },
+      select: {
+        wallet: true,
+        username: true,
+        displayName: true,
+        bio: true,
+        avatarUrl: true,
+        website: true,
+        twitter: true,
+        discord: true,
+        verified: true,
+      },
     }),
   ]);
 
   const serialized = mints.map((m) => ({
     ...m,
+    createdAt: m.createdAt.toISOString(),
     listing: m.listing
       ? {
           ...m.listing,
@@ -35,7 +65,7 @@ export default async function ProfilePage({ params }: PageProps) {
 
   return (
     <ProfileClient
-      wallet={params.wallet}
+      wallet={wallet}
       mints={serialized}
       followerCount={followerCount}
       followingCount={followingCount}

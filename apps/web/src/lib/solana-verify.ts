@@ -5,12 +5,18 @@
  */
 
 import { getConnection } from "./rpc";
+import type { Finality } from "@solana/web3.js";
 
 const MAX_TX_AGE_SECONDS = 600; // 10 minutes
 
 export interface TxVerifyResult {
   valid: boolean;
   error?: string;
+}
+
+export interface TxVerifyOptions {
+  commitment?: Finality;
+  maxTxAgeSeconds?: number;
 }
 
 /**
@@ -27,7 +33,10 @@ export interface TxVerifyResult {
 export async function verifyTransaction(
   txSignature: string,
   expectedWallet: string,
-  expectedMintAddress?: string
+  expectedMintAddress?: string,
+  requiredAccountAddresses: string[] = [],
+  requiredProgramIds: string[] = [],
+  options: TxVerifyOptions = {}
 ): Promise<TxVerifyResult> {
   try {
     // Use the RPC manager for automatic failover
@@ -36,6 +45,7 @@ export async function verifyTransaction(
     // Fetch the transaction
     const tx = await connection.getTransaction(txSignature, {
       maxSupportedTransactionVersion: 0,
+      commitment: options.commitment,
     });
 
     if (!tx) {
@@ -51,11 +61,12 @@ export async function verifyTransaction(
       return { valid: false, error: "Block time unavailable — cannot verify recency" };
     }
 
+    const maxTxAgeSeconds = options.maxTxAgeSeconds ?? MAX_TX_AGE_SECONDS;
     const ageSeconds = Math.floor(Date.now() / 1000) - tx.blockTime;
-    if (ageSeconds > MAX_TX_AGE_SECONDS) {
+    if (ageSeconds > maxTxAgeSeconds) {
       return {
         valid: false,
-        error: `Transaction too old (${ageSeconds}s ago, max ${MAX_TX_AGE_SECONDS}s)`,
+        error: `Transaction too old (${ageSeconds}s ago, max ${maxTxAgeSeconds}s)`,
       };
     }
 
@@ -70,20 +81,49 @@ export async function verifyTransaction(
       };
     }
 
+    const accountKeyStrings: string[] = [];
+    for (let i = 0; i < accountKeys.length; i++) {
+      const key = accountKeys.get(i)?.toBase58();
+      if (key) accountKeyStrings.push(key);
+    }
+
     // If a mint address is expected, verify it appears in the account keys
-    if (expectedMintAddress) {
-      let found = false;
-      for (let i = 0; i < accountKeys.length; i++) {
-        if (accountKeys.get(i)?.toBase58() === expectedMintAddress) {
-          found = true;
-          break;
-        }
-      }
-      if (!found) {
+    if (expectedMintAddress && !accountKeyStrings.includes(expectedMintAddress)) {
+      return {
+        valid: false,
+        error: `Mint address ${expectedMintAddress} not referenced in transaction`,
+      };
+    }
+
+    for (const requiredAddress of requiredAccountAddresses) {
+      if (!accountKeyStrings.includes(requiredAddress)) {
         return {
           valid: false,
-          error: `Mint address ${expectedMintAddress} not referenced in transaction`,
+          error: `Required account ${requiredAddress} not referenced in transaction`,
         };
+      }
+    }
+
+    if (requiredProgramIds.length > 0) {
+      const message = tx.transaction.message as unknown as {
+        compiledInstructions?: Array<{ programIdIndex: number }>;
+        instructions?: Array<{ programIdIndex: number }>;
+      };
+      const compiledInstructions =
+        message.compiledInstructions ?? message.instructions ?? [];
+
+      for (const requiredProgramId of requiredProgramIds) {
+        const invoked = compiledInstructions.some((ix) => {
+          const programKey = accountKeys.get(ix.programIdIndex)?.toBase58();
+          return programKey === requiredProgramId;
+        });
+
+        if (!invoked) {
+          return {
+            valid: false,
+            error: `Required program ${requiredProgramId} not invoked in transaction`,
+          };
+        }
       }
     }
 

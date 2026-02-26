@@ -1,6 +1,6 @@
-import { writeFileSync, mkdirSync, existsSync } from "fs";
+import { writeFileSync, mkdirSync, existsSync, unlinkSync } from "fs";
 import { join, resolve } from "path";
-import { put } from "@vercel/blob";
+import { put, del } from "@vercel/blob";
 import { sanitizeFilename } from "@/lib/filename";
 
 const STORAGE_DIR = join(process.cwd(), "public", "uploads");
@@ -13,6 +13,72 @@ function ensureDir(dir: string): void {
 
 export interface UploadResult {
   url: string;
+}
+
+function getUploadsRoot(): string {
+  return resolve(STORAGE_DIR);
+}
+
+function normalizeUrlLike(value: string): URL | null {
+  try {
+    return new URL(value);
+  } catch {
+    try {
+      return new URL(value, "http://local.test");
+    } catch {
+      return null;
+    }
+  }
+}
+
+function isHtmlContentType(contentType: string): boolean {
+  return contentType.split(";")[0]?.trim().toLowerCase() === "text/html";
+}
+
+function extractBlobUrlFromStoredUrl(url: string): string {
+  const parsed = normalizeUrlLike(url);
+  if (!parsed) {
+    throw new Error("Invalid URL");
+  }
+
+  if (parsed.pathname === "/api/blob") {
+    const proxied = parsed.searchParams.get("url");
+    if (!proxied) {
+      throw new Error("Missing proxied blob URL");
+    }
+    return proxied;
+  }
+
+  return parsed.toString();
+}
+
+function resolveLocalUploadPathFromUrl(url: string): string {
+  const parsed = normalizeUrlLike(url);
+  if (!parsed) {
+    throw new Error("Invalid URL");
+  }
+
+  const pathname = parsed.pathname || "";
+  let rawFilename = "";
+  if (pathname.startsWith("/uploads/")) {
+    rawFilename = pathname.slice("/uploads/".length);
+  } else if (pathname === "/api/artifact") {
+    rawFilename = parsed.searchParams.get("file") ?? "";
+  } else {
+    throw new Error("URL is not an uploads path");
+  }
+
+  const filename = sanitizeFilename(rawFilename);
+  if (!filename) {
+    throw new Error("Invalid upload filename");
+  }
+
+  const fullPath = resolve(STORAGE_DIR, filename);
+  if (!fullPath.startsWith(getUploadsRoot())) {
+    throw new Error("Resolved upload path is outside uploads directory");
+  }
+
+  return fullPath;
 }
 
 /**
@@ -73,7 +139,32 @@ export async function uploadFile(
 
     writeFileSync(filePath, data);
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    if (isHtmlContentType(contentType)) {
+      return { url: `${baseUrl}/api/artifact?file=${encodeURIComponent(safeFilename)}` };
+    }
     return { url: `${baseUrl}/uploads/${safeFilename}` };
+  }
+
+  throw new Error(
+    `Storage provider "${provider}" is not implemented. ` +
+    `Set STORAGE_PROVIDER=local for development, or STORAGE_PROVIDER=vercel-blob for production.`
+  );
+}
+
+export async function deleteFile(url: string): Promise<void> {
+  const provider = process.env.STORAGE_PROVIDER ?? "local";
+
+  if (provider === "vercel-blob") {
+    const blobUrl = extractBlobUrlFromStoredUrl(url);
+    await del(blobUrl);
+    return;
+  }
+
+  if (provider === "local") {
+    const filePath = resolveLocalUploadPathFromUrl(url);
+    if (!existsSync(filePath)) return;
+    unlinkSync(filePath);
+    return;
   }
 
   throw new Error(

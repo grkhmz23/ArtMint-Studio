@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { Connection, Keypair, Transaction } from "@solana/web3.js";
+import { Connection, Transaction } from "@solana/web3.js";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,8 @@ import { trackListing } from "@/lib/analytics";
 interface MintData {
   id: string;
   mintAddress: string;
+  status: string;
+  txSignature: string | null;
   inputJson: string;
   hash: string;
   imageUrl: string;
@@ -43,7 +45,15 @@ interface MintData {
 interface PreparedListing {
   serializedTransaction: string;
   saleStatePublicKey: string;
-  saleStateSecretKey: string;
+  blockhash: string;
+  lastValidBlockHeight: number;
+  estimatedFee: number;
+  expiresAt: string;
+}
+
+interface PreparedMint {
+  serializedTransaction: string;
+  mintAddress: string;
   blockhash: string;
   lastValidBlockHeight: number;
   estimatedFee: number;
@@ -51,6 +61,14 @@ interface PreparedListing {
 }
 
 type ListingStep = 
+  | "idle"
+  | "preparing"
+  | "signing"
+  | "submitting"
+  | "confirming"
+  | "success";
+
+type MintStep =
   | "idle"
   | "preparing"
   | "signing"
@@ -70,6 +88,10 @@ export function AssetClient({ mint }: { mint: MintData }) {
   const [exporting, setExporting] = useState(false);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [showAuctionModal, setShowAuctionModal] = useState(false);
+  const [mintStep, setMintStep] = useState<MintStep>("idle");
+  const [mintTxError, setMintTxError] = useState<string | null>(null);
+  const [mintTxSignature, setMintTxSignature] = useState<string | null>(null);
+  const [preparedMint, setPreparedMint] = useState<PreparedMint | null>(null);
 
   const parsedInput = useMemo(() => {
     try {
@@ -147,7 +169,104 @@ export function AssetClient({ mint }: { mint: MintData }) {
   }, [canonicalInput]);
 
   const handleRerender4K = () => {
-    window.open(mint.animationUrl, "_blank");
+    window.open(mint.animationUrl, "_blank", "noopener,noreferrer");
+  };
+
+  const handleCompleteMint = async () => {
+    if (!publicKey || !signTransaction) return;
+    if (mint.status === "confirmed") return;
+
+    if (publicKey.toBase58() !== mint.wallet) {
+      setMintTxError("Only the creator wallet can complete this mint");
+      return;
+    }
+
+    setMintTxError(null);
+
+    try {
+      setMintStep("preparing");
+      const prepareRes = await fetch("/api/mint/prepare", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          placeholderMintAddress: mint.mintAddress,
+        }),
+      });
+
+      if (!prepareRes.ok) {
+        const err = await prepareRes.json().catch(() => ({}));
+        throw new Error(err.error ?? "Failed to prepare mint transaction");
+      }
+
+      const prepareData = await prepareRes.json();
+      const prepared: PreparedMint = prepareData.prepared;
+      setPreparedMint(prepared);
+
+      setMintStep("signing");
+      const transaction = Transaction.from(
+        Buffer.from(prepared.serializedTransaction, "base64")
+      );
+      const signedTx = await signTransaction(transaction);
+
+      setMintStep("submitting");
+      const cluster = (process.env.NEXT_PUBLIC_SOLANA_CLUSTER ?? "devnet").toLowerCase();
+      const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL ?? (
+        cluster === "mainnet-beta" || cluster === "mainnet"
+          ? "https://api.mainnet-beta.solana.com"
+          : "https://api.devnet.solana.com"
+      );
+      const connection = new Connection(rpcUrl, "confirmed");
+
+      const signature = await connection.sendRawTransaction(signedTx.serialize(), {
+        skipPreflight: false,
+        preflightCommitment: "confirmed",
+      });
+      setMintTxSignature(signature);
+
+      setMintStep("confirming");
+      const confirmed = await Promise.race([
+        connection.confirmTransaction(
+          {
+            signature,
+            blockhash: prepared.blockhash,
+            lastValidBlockHeight: prepared.lastValidBlockHeight,
+          },
+          "finalized"
+        ),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Mint confirmation timeout")), 120000)
+        ),
+      ]);
+
+      if (confirmed.value.err) {
+        throw new Error("Mint transaction failed on-chain");
+      }
+
+      const confirmRes = await fetch("/api/mint/confirm", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          placeholderMintAddress: mint.mintAddress,
+          mintAddress: prepared.mintAddress,
+          txSignature: signature,
+        }),
+      });
+
+      if (!confirmRes.ok) {
+        const err = await confirmRes.json().catch(() => ({}));
+        throw new Error(err.error ?? "Failed to confirm mint");
+      }
+
+      const confirmData = await confirmRes.json();
+      setMintStep("success");
+      setTimeout(() => {
+        window.location.href = `/asset/${confirmData.mintAddress ?? prepared.mintAddress}`;
+      }, 1200);
+    } catch (err) {
+      console.error("Mint completion error:", err);
+      setMintTxError(err instanceof Error ? err.message : "Mint failed");
+      setMintStep("idle");
+    }
   };
 
   /**
@@ -303,8 +422,28 @@ export function AssetClient({ mint }: { mint: MintData }) {
   };
 
   const isListingInProgress = listingStep !== "idle" && listingStep !== "success";
+  const isMintInProgress = mintStep !== "idle" && mintStep !== "success";
   const isListed = mint.listing?.status === "active";
   const isOwner = publicKey?.toBase58() === mint.wallet;
+  const isPendingMint = mint.status !== "confirmed";
+  const canCompleteMint = isPendingMint && isOwner;
+
+  const getMintStatusMessage = () => {
+    switch (mintStep) {
+      case "preparing":
+        return "Preparing mint tx...";
+      case "signing":
+        return "Sign mint in wallet...";
+      case "submitting":
+        return "Submitting mint...";
+      case "confirming":
+        return "Confirming mint...";
+      case "success":
+        return "Minted!";
+      default:
+        return "Complete On-Chain Mint";
+    }
+  };
 
   const provenanceRows = isUpload
     ? [
@@ -317,7 +456,7 @@ export function AssetClient({ mint }: { mint: MintData }) {
         { label: "Algorithm", value: canonicalInput?.templateId ?? "---" },
         { label: "Seed Config", value: String(canonicalInput?.seed ?? "---") },
         { label: "Core Engine", value: canonicalInput?.rendererVersion ?? "---" },
-        { label: "Tx Hash", value: mint.hash.slice(0, 8) + "..." + mint.hash.slice(-4) },
+        { label: "Art Hash", value: mint.hash.slice(0, 8) + "..." + mint.hash.slice(-4) },
       ];
 
   return (
@@ -538,6 +677,103 @@ export function AssetClient({ mint }: { mint: MintData }) {
               )}
             </motion.div>
 
+            {/* On-chain Mint (for pending records) */}
+            <motion.div initial="hidden" animate="show" variants={fadeUp} className="space-y-4 pt-4">
+              <div className={cn(
+                "border p-6",
+                isPendingMint ? "border-[var(--accent)]/40 bg-[var(--accent)]/5" : "border-[var(--success)]/40 bg-[var(--success)]/5"
+              )}>
+                <label className="font-mono text-[10px] text-[var(--text-dim)] uppercase tracking-widest block mb-4">
+                  On-Chain Record
+                </label>
+                <div className="space-y-2 font-mono text-[10px]">
+                  <div className="flex justify-between gap-3">
+                    <span className="text-[var(--text-dim)] uppercase tracking-widest">Status</span>
+                    <span className={isPendingMint ? "text-[var(--accent)]" : "text-[var(--success)]"}>
+                      {mint.status}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-[var(--text-dim)] uppercase tracking-widest">Creator</span>
+                    <span className="text-white">
+                      {mint.wallet.slice(0, 6)}...{mint.wallet.slice(-4)}
+                    </span>
+                  </div>
+                </div>
+                {mint.txSignature ? (
+                  <a
+                    href={getExplorerUrl(mint.txSignature)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-4 inline-block font-mono text-[10px] text-[var(--accent)] hover:underline"
+                  >
+                    View mint transaction on Explorer →
+                  </a>
+                ) : (
+                  <p className="font-mono text-[10px] text-[var(--text-dim)] mt-4">
+                    No on-chain mint transaction yet.
+                  </p>
+                )}
+              </div>
+            </motion.div>
+
+            {/* Complete on-chain mint (pending records only) */}
+            {isPendingMint && (
+              <motion.div initial="hidden" animate="show" variants={fadeUp} className="space-y-4 pt-4">
+                <div className="border border-[var(--accent)]/40 p-6 bg-[var(--accent)]/5">
+                  <label className="font-mono text-[10px] text-[var(--text-dim)] uppercase tracking-widest block mb-4">
+                    On-Chain Mint Status
+                  </label>
+                  <p className="font-mono text-[10px] text-[var(--text-dim)] mb-4">
+                    This asset is prepared off-chain but not yet minted on Solana.
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleCompleteMint}
+                    disabled={!canCompleteMint || isMintInProgress || mintStep === "success"}
+                  >
+                    {getMintStatusMessage()}
+                  </Button>
+                  {mintStep === "success" && mintTxSignature && (
+                    <div className="mt-4 p-3 border border-[var(--success)] bg-[var(--success)]/5">
+                      <p className="font-mono text-[10px] text-[var(--success)] mb-2">
+                        ✓ Mint confirmed! Redirecting to the real mint address...
+                      </p>
+                      <a
+                        href={getExplorerUrl(mintTxSignature)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono text-[10px] text-[var(--accent)] hover:underline"
+                      >
+                        View transaction on Explorer →
+                      </a>
+                    </div>
+                  )}
+                  {mintTxError && (
+                    <div className="font-mono text-[10px] text-[var(--danger)] mt-3">
+                      {mintTxError}
+                    </div>
+                  )}
+                  {!publicKey && (
+                    <div className="font-mono text-[10px] text-[var(--text-dim)] mt-3">
+                      Connect wallet to complete mint
+                    </div>
+                  )}
+                  {publicKey && !isOwner && (
+                    <div className="font-mono text-[10px] text-[var(--text-dim)] mt-3">
+                      Connect the creator wallet to complete mint
+                    </div>
+                  )}
+                  {preparedMint && mintStep !== "success" && (
+                    <div className="mt-3 font-mono text-[10px] text-[var(--text-dim)]">
+                      Pending mint address: {preparedMint.mintAddress.slice(0, 6)}...{preparedMint.mintAddress.slice(-4)}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+
             {/* Listing */}
             <motion.div initial="hidden" animate="show" variants={fadeUp} className="space-y-4 pt-4">
               {isListed ? (
@@ -584,10 +820,15 @@ export function AssetClient({ mint }: { mint: MintData }) {
                     variant="outline"
                     className="w-full"
                     onClick={handleListBuyNow}
-                    disabled={isListingInProgress || !publicKey || !listPrice || listingStep === "success"}
+                    disabled={isPendingMint || isListingInProgress || !publicKey || !listPrice || listingStep === "success"}
                   >
                     {getListingStatusMessage()}
                   </Button>
+                  {isPendingMint && (
+                    <div className="font-mono text-[10px] text-[var(--text-dim)] mt-2">
+                      Complete the on-chain mint before listing.
+                    </div>
+                  )}
                   
                   {/* Transaction progress indicator */}
                   {isListingInProgress && (
@@ -627,7 +868,7 @@ export function AssetClient({ mint }: { mint: MintData }) {
                   
                   {/* Success message with explorer link */}
                   {/* Create Auction Button - only show if not listed and is owner */}
-                  {!isListed && isOwner && (
+                  {!isListed && isOwner && !isPendingMint && (
                     <div className="mt-4 pt-4 border-t border-[var(--border)]">
                       <button
                         onClick={() => setShowAuctionModal(true)}
@@ -639,7 +880,7 @@ export function AssetClient({ mint }: { mint: MintData }) {
                   )}
 
                   {/* Make Offer Button - only show if not listed and not owner */}
-                  {!isListed && !isOwner && (
+                  {!isListed && !isOwner && !isPendingMint && (
                     <div className="mt-4 pt-4 border-t border-[var(--border)]">
                       <MakeOfferButton
                         mintAddress={mint.mintAddress}

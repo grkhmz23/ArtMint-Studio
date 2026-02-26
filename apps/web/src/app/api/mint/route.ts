@@ -3,23 +3,81 @@ import { z } from "zod";
 import { generateSVG, renderPNGFromSVG, buildHtmlArtifact, RENDERER_VERSION } from "@artmint/render";
 import { computeHash, stableStringify, flowFieldsParamsSchema, jazzNoirParamsSchema } from "@artmint/common";
 import { uploadFile } from "@/lib/storage";
+import { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/db";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth";
 
-const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+const hexColor = z
+  .string()
+  .regex(/^#[0-9a-fA-F]{6}$/)
+  .transform((value) => value.toLowerCase());
+const flowFieldsParamsStrictSchema = flowFieldsParamsSchema.strict();
+const jazzNoirParamsStrictSchema = jazzNoirParamsSchema.strict();
+const METAPLEX_NAME_MAX_BYTES = 32;
+
+function getTemplateParamsSchema(templateId: "flow_fields" | "jazz_noir") {
+  return templateId === "flow_fields"
+    ? flowFieldsParamsStrictSchema
+    : jazzNoirParamsStrictSchema;
+}
+
+function normalizeOptionalText(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+async function buildDuplicatePendingMintResponse(
+  placeholderMintAddress: string,
+  wallet: string,
+  fallbackCanonicalInput: unknown
+): Promise<NextResponse | null> {
+  const existing = await prisma.mint.findUnique({
+    where: { mintAddress: placeholderMintAddress },
+  });
+
+  if (!existing) return null;
+
+  if (existing.wallet !== wallet) {
+    return NextResponse.json(
+      {
+        error: "An identical pending mint already exists for another wallet",
+        code: "duplicate_pending_mint",
+      },
+      { status: 409 }
+    );
+  }
+
+  let canonicalInput = fallbackCanonicalInput;
+  try {
+    canonicalInput = JSON.parse(existing.inputJson);
+  } catch {
+    // Fall back to the canonical input computed for this request.
+  }
+
+  return NextResponse.json({
+    success: true,
+    reused: true,
+    hash: existing.hash,
+    metadataUrl: existing.metadataUrl,
+    imageUrl: existing.imageUrl,
+    animationUrl: existing.animationUrl,
+    placeholderMintAddress: existing.mintAddress,
+    canonicalInput,
+  });
+}
 
 const mintRequestSchema = z.object({
   templateId: z.enum(["flow_fields", "jazz_noir"]),
   seed: z.number().int().min(0).max(999999999),
   palette: z.array(hexColor).min(2).max(8),
   params: z.record(z.unknown()),
-  prompt: z.string().min(1).max(500),
-  title: z.string().max(200).optional(),
+  prompt: z.string().trim().min(1).max(500),
+  title: z.string().trim().max(200).optional(),
 }).superRefine((data, ctx) => {
-  const schema = data.templateId === "flow_fields" ? flowFieldsParamsSchema : jazzNoirParamsSchema;
+  const schema = getTemplateParamsSchema(data.templateId);
   const result = schema.safeParse(data.params);
   if (!result.success) {
     for (const issue of result.error.issues) {
@@ -28,6 +86,14 @@ const mintRequestSchema = z.object({
         path: ["params", ...issue.path],
       });
     }
+  }
+
+  if (data.title && Buffer.byteLength(data.title, "utf8") > METAPLEX_NAME_MAX_BYTES) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["title"],
+      message: `Title exceeds on-chain metadata limit (${METAPLEX_NAME_MAX_BYTES} UTF-8 bytes max)`,
+    });
   }
 });
 
@@ -58,7 +124,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { templateId, seed, palette, params, prompt, title } = parsed.data;
+    const templateId = parsed.data.templateId;
+    const seed = parsed.data.seed;
+    const palette = parsed.data.palette;
+    const prompt = parsed.data.prompt;
+    const title = normalizeOptionalText(parsed.data.title);
+    const params = getTemplateParamsSchema(templateId).parse(parsed.data.params);
 
     // 1. Build canonical input
     const createdAt = new Date().toISOString();
@@ -72,6 +143,14 @@ export async function POST(req: NextRequest) {
     };
     const hash = computeHash(deterministicInput);
     const canonicalInput = { ...deterministicInput, createdAt };
+    const placeholderMintAddress = `pending-${hash.slice(0, 16)}`;
+
+    const duplicateBeforeUpload = await buildDuplicatePendingMintResponse(
+      placeholderMintAddress,
+      wallet,
+      canonicalInput
+    );
+    if (duplicateBeforeUpload) return duplicateBeforeUpload;
 
     // 2. Generate assets
     const svg = generateSVG({ templateId, seed, palette, params });
@@ -114,20 +193,38 @@ export async function POST(req: NextRequest) {
     const metadataResult = await uploadFile(metadataJson, `${fileId}-metadata.json`, "application/json");
 
     // 5. Save to database — wallet comes from session, not body
-    const placeholderMintAddress = `pending-${hash.slice(0, 16)}`;
+    try {
+      await prisma.mint.create({
+        data: {
+          mintAddress: placeholderMintAddress,
+          inputJson: stableStringify(canonicalInput),
+          hash,
+          imageUrl: imageResult.url,
+          animationUrl: animationResult.url,
+          metadataUrl: metadataResult.url,
+          title: title ?? `ArtMint #${seed}`,
+          wallet,
+        },
+      });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === "P2002"
+      ) {
+        const duplicateAfterUpload = await buildDuplicatePendingMintResponse(
+          placeholderMintAddress,
+          wallet,
+          canonicalInput
+        );
+        if (duplicateAfterUpload) return duplicateAfterUpload;
 
-    await prisma.mint.create({
-      data: {
-        mintAddress: placeholderMintAddress,
-        inputJson: stableStringify(canonicalInput),
-        hash,
-        imageUrl: imageResult.url,
-        animationUrl: animationResult.url,
-        metadataUrl: metadataResult.url,
-        title: title ?? `ArtMint #${seed}`,
-        wallet,
-      },
-    });
+        return NextResponse.json(
+          { error: "Duplicate pending mint", code: "duplicate_pending_mint" },
+          { status: 409 }
+        );
+      }
+      throw err;
+    }
 
     return NextResponse.json({
       success: true,
