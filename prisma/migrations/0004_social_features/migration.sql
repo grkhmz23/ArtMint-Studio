@@ -95,5 +95,5 @@ ALTER TABLE "CollectionItem" ADD CONSTRAINT "CollectionItem_mintAddress_fkey"
     FOREIGN KEY ("mintAddress") REFERENCES "Mint"("mintAddress") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- Add indexes to Mint table for better query performance
-CREATE INDEX "Mint_status_idx" ON "Mint"("status");
-CREATE INDEX "Mint_createdAt_idx" ON "Mint"("createdAt");
+CREATE INDEX IF NOT EXISTS "Mint_status_idx" ON "Mint"("status");
+CREATE INDEX IF NOT EXISTS "Mint_createdAt_idx" ON "Mint"("createdAt");

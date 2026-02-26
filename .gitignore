@@ -10,3 +10,5 @@ dist/
 coverage/
 .turbo/
 public/uploads/
+.vercel
+.env*.local

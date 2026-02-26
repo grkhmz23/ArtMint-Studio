@@ -10,7 +10,7 @@
 #   base_url: The deployment URL (default: http://localhost:3000)
 #
 
-set -e
+set -uo pipefail
 
 # Colors for output
 RED='\033[0;31m'
@@ -32,15 +32,15 @@ echo ""
 # Helper functions
 pass() {
     echo -e "${GREEN}✓${NC} $1"
-    ((PASSED++))
+    PASSED=$((PASSED + 1))
 }
 
 fail() {
     echo -e "${RED}✗${NC} $1"
-    if [ -n "$2" ]; then
+    if [ -n "${2:-}" ]; then
         echo "  Details: $2"
     fi
-    ((FAILED++))
+    FAILED=$((FAILED + 1))
 }
 
 warn() {
@@ -179,8 +179,30 @@ fi
 
 echo ""
 
-# Test 6: Page Routes
-echo "Test 6: Page Routes"
+# Test 6: Public Data APIs (catches missing DB migrations/schema drift)
+echo "Test 6: Public Data APIs"
+echo "------------------------"
+
+PUBLIC_APIS=("/api/explore" "/api/auctions" "/api/collections")
+for api in "${PUBLIC_APIS[@]}"; do
+    API_RESPONSE=$(curl -s -w "\n%{http_code}" "${BASE_URL}${api}" 2>/dev/null || echo "Connection failed")
+    API_STATUS=$(echo "$API_RESPONSE" | tail -n1)
+    API_BODY=$(echo "$API_RESPONSE" | sed '$d')
+    if [ "$API_STATUS" = "200" ]; then
+        pass "Public API ${api} returns 200"
+    else
+        fail "Public API ${api} returned ${API_STATUS}" "$(echo "$API_BODY" | tr '\n' ' ' | head -c 200)"
+    fi
+done
+
+if [ "$FAILED" -gt 0 ]; then
+    warn "If these APIs fail with 500, check Vercel logs for Prisma P2021 and run production migrations (prisma migrate deploy)."
+fi
+
+echo ""
+
+# Test 7: Page Routes
+echo "Test 7: Page Routes"
 echo "-------------------"
 
 ROUTES=("/" "/studio" "/upload" "/dashboard")
@@ -195,8 +217,8 @@ done
 
 echo ""
 
-# Test 7: CORS Configuration
-echo "Test 7: CORS Configuration"
+# Test 8: CORS Configuration
+echo "Test 8: CORS Configuration"
 echo "--------------------------"
 
 # Test with invalid origin
@@ -212,8 +234,8 @@ fi
 
 echo ""
 
-# Test 8: Environment Check (via health endpoint)
-echo "Test 8: Environment Configuration"
+# Test 9: Environment Check (via health endpoint)
+echo "Test 9: Environment Configuration"
 echo "---------------------------------"
 
 if [ -n "$HEALTH_BODY" ]; then
