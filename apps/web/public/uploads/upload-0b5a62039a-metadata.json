@@ -1,0 +1,107 @@
+{
+  "name": "solana logo",
+  "symbol": "ARTMINT",
+  "description": "ArtMint upload smoke test",
+  "image": "http://localhost:3000/uploads/upload-0b5a62039a-mint.webp",
+  "external_url": "http://localhost:3000/asset/pending",
+  "attributes": [
+    {
+      "trait_type": "Kind",
+      "value": "upload"
+    },
+    {
+      "trait_type": "Original SHA-256",
+      "value": "0b5a62039ab114ff2bcf37bd24471192f2998cf9dbf6f227b98a3c4eedb2a7ac"
+    },
+    {
+      "trait_type": "Original Filename",
+      "value": "solana_logo.jpg"
+    },
+    {
+      "trait_type": "Original MIME",
+      "value": "image/jpeg"
+    },
+    {
+      "trait_type": "Original Bytes",
+      "value": "8199"
+    },
+    {
+      "trait_type": "Original Dimensions",
+      "value": "400x400"
+    },
+    {
+      "trait_type": "Mint MIME",
+      "value": "image/webp"
+    },
+    {
+      "trait_type": "Mint Bytes",
+      "value": "3340"
+    },
+    {
+      "trait_type": "Mint Dimensions",
+      "value": "400x400"
+    },
+    {
+      "trait_type": "Mint Format",
+      "value": "webp"
+    },
+    {
+      "trait_type": "Compression Quality",
+      "value": "0.85"
+    },
+    {
+      "trait_type": "Thumbnail Dimensions",
+      "value": "400x400"
+    }
+  ],
+  "properties": {
+    "files": [
+      {
+        "uri": "http://localhost:3000/uploads/upload-0b5a62039a-mint.webp",
+        "type": "image/webp"
+      },
+      {
+        "uri": "http://localhost:3000/uploads/upload-0b5a62039a-thumb.webp",
+        "type": "image/webp"
+      },
+      {
+        "uri": "http://localhost:3000/uploads/upload-0b5a62039a-original.jpg",
+        "type": "image/jpeg"
+      }
+    ],
+    "category": "image",
+    "provenance": {
+      "kind": "upload",
+      "createdAt": "2026-02-26T22:25:37.314Z",
+      "appVersion": "smoke-test",
+      "rendererVersion": null,
+      "original": {
+        "sha256": "0b5a62039ab114ff2bcf37bd24471192f2998cf9dbf6f227b98a3c4eedb2a7ac",
+        "filename": "solana_logo.jpg",
+        "mime": "image/jpeg",
+        "bytes": 8199,
+        "width": 400,
+        "height": 400,
+        "url": "http://localhost:3000/uploads/upload-0b5a62039a-original.jpg"
+      },
+      "mint": {
+        "mime": "image/webp",
+        "bytes": 3340,
+        "width": 400,
+        "height": 400,
+        "format": "webp",
+        "quality": 0.85,
+        "fit": "contain",
+        "maxSide": 400,
+        "url": "http://localhost:3000/uploads/upload-0b5a62039a-mint.webp"
+      },
+      "thumbnail": {
+        "mime": "image/webp",
+        "bytes": 3340,
+        "width": 400,
+        "height": 400,
+        "url": "http://localhost:3000/uploads/upload-0b5a62039a-thumb.webp"
+      }
+    }
+  }
+}

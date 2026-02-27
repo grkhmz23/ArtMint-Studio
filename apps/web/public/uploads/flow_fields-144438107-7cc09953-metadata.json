@@ -1,0 +1,40 @@
+{
+  "name": "Smoke Mint 144438107",
+  "symbol": "ARTMINT",
+  "description": "Deterministic generative art created from prompt: \"Smoke test mint 2026-02-26T22:20:41.546Z\"",
+  "image": "http://localhost:3000/uploads/flow_fields-144438107-7cc09953.png",
+  "animation_url": "http://localhost:3000/api/artifact?file=flow_fields-144438107-7cc09953.html",
+  "external_url": "http://localhost:3000/asset/pending",
+  "attributes": [
+    {
+      "trait_type": "Template",
+      "value": "flow_fields"
+    },
+    {
+      "trait_type": "Seed",
+      "value": "144438107"
+    },
+    {
+      "trait_type": "Renderer Version",
+      "value": "1.0.0"
+    },
+    {
+      "trait_type": "Hash",
+      "value": "7cc09953a7782545ba76f7ca951e9513f7c1ffc187da5f7520074bf86c9304b6"
+    }
+  ],
+  "properties": {
+    "files": [
+      {
+        "uri": "http://localhost:3000/uploads/flow_fields-144438107-7cc09953.png",
+        "type": "image/png"
+      },
+      {
+        "uri": "http://localhost:3000/api/artifact?file=flow_fields-144438107-7cc09953.html",
+        "type": "text/html"
+      }
+    ],
+    "category": "html",
+    "canonicalInput": "{\"createdAt\":\"2026-02-26T22:20:42.968Z\",\"palette\":[\"#101820\",\"#f2aa4c\",\"#d81159\",\"#1e88e5\"],\"params\":{\"contrast\":1.1,\"curvature\":5,\"density\":0.55,\"fieldScale\":2.75,\"grain\":0.5,\"lineCount\":275,\"lineWidth\":4.25,\"stepCount\":105,\"turbulence\":1},\"prompt\":\"Smoke test mint 2026-02-26T22:20:41.546Z\",\"rendererVersion\":\"1.0.0\",\"seed\":144438107,\"templateId\":\"flow_fields\"}"
+  }
+}

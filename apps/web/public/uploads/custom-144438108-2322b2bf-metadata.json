@@ -1,0 +1,40 @@
+{
+  "name": "Custom 144438108",
+  "symbol": "ARTMINT",
+  "description": "ArtMint custom smoke test",
+  "image": "http://localhost:3000/uploads/custom-144438108-2322b2bf.png",
+  "animation_url": "http://localhost:3000/api/artifact?file=custom-144438108-2322b2bf.html",
+  "external_url": "http://localhost:3000/asset/pending",
+  "attributes": [
+    {
+      "trait_type": "Template",
+      "value": "custom_code"
+    },
+    {
+      "trait_type": "Seed",
+      "value": "144438108"
+    },
+    {
+      "trait_type": "Renderer Version",
+      "value": "1.0.0"
+    },
+    {
+      "trait_type": "Hash",
+      "value": "2322b2bf3c2272f72128fa548fbce9fb2c0e433b7a610a7f431892b04fa24f0b"
+    }
+  ],
+  "properties": {
+    "files": [
+      {
+        "uri": "http://localhost:3000/uploads/custom-144438108-2322b2bf.png",
+        "type": "image/png"
+      },
+      {
+        "uri": "http://localhost:3000/api/artifact?file=custom-144438108-2322b2bf.html",
+        "type": "text/html"
+      }
+    ],
+    "category": "html",
+    "canonicalInput": "{\"createdAt\":\"2026-02-26T22:20:59.444Z\",\"palette\":[\"#0b132b\",\"#3a86ff\",\"#f2aa4c\"],\"params\":{\"code\":\"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1080 1080'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%' stop-color='#0b132b'/><stop offset='100%' stop-color='#3a86ff'/></linearGradient></defs><rect width='1080' height='1080' fill='url(#g)'/><circle cx='540' cy='540' r='260' fill='#f2aa4c' opacity='0.9'/></svg>\"},\"prompt\":\"custom_code\",\"rendererVersion\":\"1.0.0\",\"seed\":144438108,\"templateId\":\"custom_code\"}"
+  }
+}
