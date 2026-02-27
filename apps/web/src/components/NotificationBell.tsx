@@ -34,6 +34,12 @@ export function NotificationBell() {
     if (!publicKey) return;
     try {
       const res = await fetch("/api/notifications?limit=5");
+      if (res.status === 401 || res.status === 403) {
+        // Wallet connected but app session not authenticated yet.
+        setNotifications([]);
+        setUnreadCount(0);
+        return;
+      }
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
       setNotifications(data.notifications);
