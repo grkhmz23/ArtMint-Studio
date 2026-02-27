@@ -2,6 +2,7 @@ import { writeFileSync, mkdirSync, existsSync, unlinkSync } from "fs";
 import { join, resolve } from "path";
 import { put, del } from "@vercel/blob";
 import { sanitizeFilename } from "@/lib/filename";
+import { getBlobReadWriteToken } from "./blob";
 
 const STORAGE_DIR = join(process.cwd(), "public", "uploads");
 
@@ -14,6 +15,8 @@ function ensureDir(dir: string): void {
 export interface UploadResult {
   url: string;
 }
+
+type BlobAccess = "public" | "private";
 
 function getUploadsRoot(): string {
   return resolve(STORAGE_DIR);
@@ -84,11 +87,44 @@ function resolveLocalUploadPathFromUrl(url: string): string {
 /**
  * Determine whether the Vercel Blob store uses public or private access.
  * Set BLOB_ACCESS=private in env if your store is private.
+ * If the configured value is wrong, uploadFile will retry once with the
+ * opposite access mode when Vercel returns a store-access mismatch error.
  */
-function getBlobAccess(): "public" | "private" {
+function getBlobAccess(): BlobAccess {
   const val = process.env.BLOB_ACCESS?.toLowerCase();
   if (val === "private") return "private";
   return "public";
+}
+
+function getBaseUrl(): string {
+  return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+}
+
+function buildBlobProxyUrl(blobUrl: string): string {
+  return `${getBaseUrl()}/api/blob?url=${encodeURIComponent(blobUrl)}`;
+}
+
+function resolveFallbackBlobAccess(
+  attemptedAccess: BlobAccess,
+  err: unknown
+): BlobAccess | null {
+  const message = err instanceof Error ? err.message : String(err);
+
+  if (
+    attemptedAccess === "public" &&
+    message.includes("Cannot use public access on a private store")
+  ) {
+    return "private";
+  }
+
+  if (
+    attemptedAccess === "private" &&
+    message.includes("Cannot use private access on a public store")
+  ) {
+    return "public";
+  }
+
+  return null;
 }
 
 export async function uploadFile(
@@ -104,17 +140,37 @@ export async function uploadFile(
       throw new Error("Invalid filename");
     }
 
-    const access = getBlobAccess();
+    let access = getBlobAccess();
+    let blob;
+    const token = getBlobReadWriteToken();
 
-    const blob = await put(safeFilename, data, {
-      access,
-      contentType,
-    });
+    try {
+      blob = await put(safeFilename, data, {
+        access,
+        contentType,
+        ...(token ? { token } : {}),
+      });
+    } catch (err) {
+      const fallbackAccess = resolveFallbackBlobAccess(access, err);
+      if (!fallbackAccess) {
+        throw err;
+      }
+
+      console.warn(
+        `Blob access mismatch for ${safeFilename}; retrying upload with ${fallbackAccess} access`
+      );
+      access = fallbackAccess;
+      blob = await put(safeFilename, data, {
+        access,
+        contentType,
+        ...(token ? { token } : {}),
+      });
+    }
 
     // For private stores, rewrite URLs to go through our proxy endpoint
     // so browser <img> tags and fetch calls can access them.
     if (access === "private") {
-      const proxyUrl = `/api/blob?url=${encodeURIComponent(blob.url)}`;
+      const proxyUrl = buildBlobProxyUrl(blob.url);
       return { url: proxyUrl };
     }
 
@@ -138,7 +194,7 @@ export async function uploadFile(
     }
 
     writeFileSync(filePath, data);
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    const baseUrl = getBaseUrl();
     if (isHtmlContentType(contentType)) {
       return { url: `${baseUrl}/api/artifact?file=${encodeURIComponent(safeFilename)}` };
     }

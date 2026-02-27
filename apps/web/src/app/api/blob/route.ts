@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { head } from "@vercel/blob";
+import { getBlobReadWriteToken } from "../../../lib/blob";
 
 export const dynamic = "force-dynamic";
 
@@ -49,15 +50,23 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const token = getBlobReadWriteToken();
+    if (!token) {
+      return NextResponse.json(
+        { error: "Blob token not configured" },
+        { status: 503 }
+      );
+    }
+
     // Get blob metadata to confirm it exists and get content type
-    const blobInfo = await head(blobUrl);
+    const blobInfo = await head(blobUrl, { token });
     const contentType = blobInfo.contentType || "application/octet-stream";
     const isHtml = isHtmlContentType(contentType);
 
     // Fetch the actual blob data using the token (set automatically by @vercel/blob)
     const response = await fetch(blobUrl, {
       headers: {
-        Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}`,
+        Authorization: `Bearer ${token}`,
       },
     });
 

@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Verify the ed25519 signature
-    const message = buildSignMessage(nonce);
+    const message = buildSignMessage(nonce, req.nextUrl.origin);
     const messageBytes = new TextEncoder().encode(message);
     let signatureBytes: Uint8Array;
     let publicKeyBytes: Uint8Array;
@@ -107,7 +107,16 @@ export async function POST(req: NextRequest) {
     setSessionCookie(res, token);
     return res;
   } catch (err) {
-    console.error("Auth verify error:", err instanceof Error ? err.message : err);
-    return NextResponse.json({ error: "Verification failed" }, { status: 500 });
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("Auth verify error:", message);
+    const isConfigError = message.includes("SESSION_SECRET");
+    return NextResponse.json(
+      {
+        error: isConfigError
+          ? "Authentication is not configured"
+          : "Verification failed",
+      },
+      { status: isConfigError ? 503 : 500 }
+    );
   }
 }

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@vercel/blob", () => ({
   head: vi.fn(),
@@ -8,6 +8,7 @@ import { head } from "@vercel/blob";
 import { GET } from "../app/api/blob/route";
 
 const mockHead = head as unknown as ReturnType<typeof vi.fn>;
+const originalBlobToken = process.env.BLOB_READ_WRITE_TOKEN;
 
 function makeReq(blobUrl: string) {
   return {
@@ -21,6 +22,15 @@ describe("/api/blob HTML artifact headers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (globalThis as any).fetch = vi.fn();
+    process.env.BLOB_READ_WRITE_TOKEN = "vercel_blob_rw_test";
+  });
+
+  afterEach(() => {
+    if (originalBlobToken === undefined) {
+      delete process.env.BLOB_READ_WRITE_TOKEN;
+    } else {
+      process.env.BLOB_READ_WRITE_TOKEN = originalBlobToken;
+    }
   });
 
   it("applies sandboxed headers to HTML blobs", async () => {
@@ -33,6 +43,9 @@ describe("/api/blob HTML artifact headers", () => {
     const res = await GET(makeReq(blobUrl));
 
     expect(res.status).toBe(200);
+    expect(mockHead).toHaveBeenCalledWith(blobUrl, {
+      token: "vercel_blob_rw_test",
+    });
     expect(res.headers.get("content-type")).toContain("text/html");
     expect(res.headers.get("x-content-type-options")).toBe("nosniff");
     expect(res.headers.get("x-frame-options")).toBe("SAMEORIGIN");
@@ -55,6 +68,9 @@ describe("/api/blob HTML artifact headers", () => {
     const res = await GET(makeReq(blobUrl));
 
     expect(res.status).toBe(200);
+    expect(mockHead).toHaveBeenCalledWith(blobUrl, {
+      token: "vercel_blob_rw_test",
+    });
     expect(res.headers.get("content-type")).toBe("image/png");
     expect(res.headers.get("x-content-type-options")).toBe("nosniff");
     expect(res.headers.get("x-frame-options")).toBeNull();

@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
     }
 
     const nonce = generateNonce();
-    const message = buildSignMessage(nonce);
+    const message = buildSignMessage(nonce, req.nextUrl.origin);
 
     // Store nonce with 5-minute expiry
     await prisma.authNonce.create({

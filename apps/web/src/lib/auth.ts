@@ -110,12 +110,13 @@ export async function requireAuth(
 }
 
 /** Build the SIWS message that the wallet signs */
-export function buildSignMessage(nonce: string): string {
-  const domain = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+export function buildSignMessage(nonce: string, domain?: string): string {
+  const resolvedDomain =
+    domain ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   return [
     `ArtMint Studio wants you to sign in with your Solana account.`,
     ``,
-    `Domain: ${domain}`,
+    `Domain: ${resolvedDomain}`,
     `Nonce: ${nonce}`,
   ].join("\n");
 }

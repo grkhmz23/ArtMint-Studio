@@ -1,5 +1,6 @@
 import { Prisma, prisma } from "@/lib/db";
 import { getConnection, getRpcManager } from "@/lib/rpc";
+import { getBlobReadWriteToken } from "./blob";
 
 export type HealthStatus = "healthy" | "degraded" | "unhealthy";
 
@@ -247,7 +248,7 @@ export async function runHealthChecks(
   // 5. Storage health
   const storageStart = Date.now();
   const storageProvider = process.env.STORAGE_PROVIDER;
-  if (storageProvider === "vercel-blob" && !process.env.BLOB_READ_WRITE_TOKEN) {
+  if (storageProvider === "vercel-blob" && !getBlobReadWriteToken()) {
     checks.push({
       name: "storage",
       status: "unhealthy",

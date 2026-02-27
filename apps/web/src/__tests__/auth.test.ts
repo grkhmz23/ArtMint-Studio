@@ -46,14 +46,22 @@ describe("auth: session tokens", () => {
 describe("auth: SIWS message", () => {
   it("builds consistent message from nonce", () => {
     const nonce = "abc123";
-    const msg = buildSignMessage(nonce);
+    const msg = buildSignMessage(nonce, "https://devnet.artmintstudio.art");
 
     expect(msg).toContain("ArtMint Studio");
     expect(msg).toContain("Nonce: abc123");
-    expect(msg).toContain("Domain:");
+    expect(msg).toContain("Domain: https://devnet.artmintstudio.art");
     // Message is deterministic (no timestamp) so nonce/verify produce identical bytes
-    const msg2 = buildSignMessage(nonce);
+    const msg2 = buildSignMessage(nonce, "https://devnet.artmintstudio.art");
     expect(msg).toBe(msg2);
+  });
+
+  it("falls back to the configured app url when no domain is passed", () => {
+    process.env.NEXT_PUBLIC_APP_URL = "https://www.artmintstudio.art";
+
+    const msg = buildSignMessage("abc123");
+
+    expect(msg).toContain("Domain: https://www.artmintstudio.art");
   });
 });
 
