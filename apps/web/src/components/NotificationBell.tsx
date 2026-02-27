@@ -6,6 +6,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
+import { useAuth } from "@/lib/use-auth";
 
 interface Notification {
   id: string;
@@ -24,6 +25,7 @@ interface Notification {
 
 export function NotificationBell() {
   const { publicKey } = useWallet();
+  const { authenticated } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
@@ -31,11 +33,12 @@ export function NotificationBell() {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const fetchNotifications = useCallback(async () => {
-    if (!publicKey) return;
+    if (!publicKey || !authenticated) return;
     try {
       const res = await fetch("/api/notifications?limit=5");
       if (res.status === 401 || res.status === 403) {
-        // Wallet connected but app session not authenticated yet.
+        // Session expired or auth is out of sync. Hide notifications until
+        // the user signs in again.
         setNotifications([]);
         setUnreadCount(0);
         return;
@@ -47,14 +50,20 @@ export function NotificationBell() {
     } catch (err) {
       console.error("Failed to load notifications:", err);
     }
-  }, [publicKey]);
+  }, [publicKey, authenticated]);
 
   useEffect(() => {
+    if (!publicKey || !authenticated) {
+      setNotifications([]);
+      setUnreadCount(0);
+      return;
+    }
+
     fetchNotifications();
     // Poll every 30 seconds
     const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
-  }, [fetchNotifications]);
+  }, [fetchNotifications, publicKey, authenticated]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -119,7 +128,7 @@ export function NotificationBell() {
     }
   };
 
-  if (!publicKey) return null;
+  if (!publicKey || !authenticated) return null;
 
   return (
     <div className="relative" ref={dropdownRef}>
